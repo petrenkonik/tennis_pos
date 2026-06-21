@@ -191,4 +191,38 @@ describe('<App/> upload flow', () => {
       expect(screen.getByText(/Could not recognize the serve/i)).toBeInTheDocument();
     });
   });
+
+  it('clicking a phase block seeks the video to the phase start and slows playback', async () => {
+    vi.mocked(analyzeServe).mockResolvedValue(successResult);
+    const user = userEvent.setup();
+
+    render(<App />);
+    const input = screen.getByLabelText(/upload serve video/i) as HTMLInputElement;
+    await act(async () => {
+      await user.upload(input, new File(['dummy'], 'serve.mp4', { type: 'video/mp4' }));
+    });
+    await waitFor(() => {
+      expect(screen.getByText(/^Rules \(0\)$/i)).toBeInTheDocument();
+    });
+
+    const video = document.querySelector('video') as HTMLVideoElement;
+    expect(video).toBeTruthy();
+
+    // trophy phase = [2, 3]; frameToMs(2) uses poses[2].timestampMs.
+    const expectedStartSec = successResult.poses[2].timestampMs / 1000;
+
+    await act(async () => {
+      await user.click(screen.getByText('Trophy'));
+    });
+
+    // Seeked to the trophy phase start and slowed to the default 0.5× rate.
+    expect(video.currentTime).toBeCloseTo(expectedStartSec, 3);
+    expect(video.playbackRate).toBeCloseTo(0.5, 2);
+
+    // Clicking the same block again clears the selection and restores 1×.
+    await act(async () => {
+      await user.click(screen.getByText('Trophy'));
+    });
+    expect(video.playbackRate).toBeCloseTo(1, 2);
+  });
 });
