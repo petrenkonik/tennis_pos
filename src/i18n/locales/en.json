@@ -1,0 +1,89 @@
+{
+  "app": {
+    "title": "Serve Analysis",
+    "reportTitle": "Rules ({{n}})",
+    "heroSubtitle": "Upload a side-view clip of a single serve. Pose is detected on-device, the serve is split into phases, and rule-based checks flag movement errors."
+  },
+  "controls": {
+    "rightHanded": "Right-handed",
+    "leftHanded": "Left-handed",
+    "settings": "Recognition settings",
+    "upload": "Upload serve video",
+    "uploadHint": "Click to choose a file",
+    "videoFormats": "MP4, WebM or MOV",
+    "mpModel": "MediaPipe model",
+    "mpLite": "lite — fast, less accurate",
+    "mpFull": "full — more accurate, slightly slower",
+    "mpHeavy": "heavy — most accurate, large/slow",
+    "visThreshold": "Joint visibility threshold: {{n}}",
+    "visThresholdHelp": "Lower — more tolerant of \"uncertain\" joints.",
+    "maxLowVis": "Share of \"bad\" frames for rejection: {{n}}",
+    "maxLowVisHelp": "Higher — try to analyze even noisy clips."
+  },
+  "status": {
+    "processing": "Processing: {{n}}%",
+    "detail": "Detail: {{value}}"
+  },
+  "skeleton": {
+    "preview": "skeleton preview",
+    "errorHint": "The skeleton is overlaid on the video (preview). Scrub the video to inspect detection: red dots mark joints where MediaPipe is unsure."
+  },
+  "errors": {
+    "video-too-long": "Video is longer than 30 seconds. Upload a short clip of a single serve.",
+    "serve-not-recognized": "Could not recognize the serve. Shoot from the side, with the player fully in frame.",
+    "pose-extraction-failed": "Could not start pose recognition. Try a different browser/file.",
+    "analysis-failed": "Internal error while parsing poses. The skeleton is shown for diagnostics.",
+    "video-read-failed": "Could not read the video. Try a different file."
+  },
+  "phases": {
+    "preparation": "Preparation",
+    "trophy": "Trophy",
+    "acceleration": "Acceleration",
+    "followThrough": "Follow-through"
+  },
+  "statusBadge": {
+    "ok": "normal",
+    "warn": "borderline",
+    "error": "error",
+    "unknown": "undetermined"
+  },
+  "report": {
+    "colRule": "Rule",
+    "colPhase": "Phase",
+    "colStatus": "Status",
+    "colValue": "Value",
+    "colNorm": "Norm",
+    "colConfidence": "Confidence",
+    "colMoment": "Moment",
+    "seekSec": "▶ {{n}}s"
+  },
+  "advice": {
+    "empty": "No errors found — nice serve!",
+    "maybe": "Maybe: "
+  },
+  "rules": {
+    "C3": {
+      "title": "Knee bend",
+      "metricName": "Knee flexion at \"trophy\"",
+      "advice": "Knees are barely bent — the legs contribute almost no energy to the hit. Bend the knees deeper in the \"trophy\" position to push upward toward the ball."
+    }
+  },
+  "lang": {
+    "en": "EN",
+    "ru": "РУ"
+  },
+  "detect": {
+    "too-few-frames": "Only {{n}} frame(s) with a full skeleton were extracted — MediaPipe could barely find the figure (player too small/far, poor light, or heavy motion blur).",
+    "low-visibility": "Key joints are not visible on {{lowPct}}% of {{total}} frames (reject threshold {{maxPct}}%, visibility threshold {{visTh}}). Most often missing: {{worst}}. Usually the cause is framing (legs/knees cut off) or the player is too small.",
+    "worst-none": "spread evenly across all joints",
+    "joint": {
+      "left-shoulder": "left shoulder",
+      "right-shoulder": "right shoulder",
+      "left-wrist": "left wrist",
+      "right-wrist": "right wrist",
+      "left-knee": "left knee",
+      "right-knee": "right knee"
+    },
+    "jointFrames": "{{joint}} — {{pct}}% of frames"
+  }
+}

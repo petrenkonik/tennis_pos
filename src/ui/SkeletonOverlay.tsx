@@ -1,4 +1,5 @@
 import { useEffect, useRef, type RefObject } from 'react';
+import i18n from '../i18n';
 import type { PoseFrame, Phases } from '../types';
 import { VISIBILITY_THRESHOLD } from '../constants/biomechanics';
 const BONES: Array<[number, number]> = [
@@ -12,10 +13,11 @@ const JOINTS = [11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28];
 
 function phaseAt(frameIndex: number, phases: Phases): string {
   const p = phases.phases;
-  if (frameIndex < p.preparation[1]) return 'Подготовка';
-  if (frameIndex < p.acceleration[0]) return 'Трофей';
-  if (frameIndex < p.acceleration[1]) return 'Разгон';
-  return 'Завершение';
+  // Singleton read (not a hook) because this runs inside a rAF loop.
+  if (frameIndex < p.preparation[1]) return i18n.t('phases.preparation');
+  if (frameIndex < p.acceleration[0]) return i18n.t('phases.trophy');
+  if (frameIndex < p.acceleration[1]) return i18n.t('phases.acceleration');
+  return i18n.t('phases.followThrough');
 }
 
 export function SkeletonOverlay(
@@ -84,7 +86,7 @@ export function SkeletonOverlay(
 
       ctx.fillStyle = '#FFFFFF';
       ctx.font = '16px sans-serif';
-      const label = phases ? phaseAt(nearest.frameIndex, phases) : 'предпросмотр скелета';
+      const label = phases ? phaseAt(nearest.frameIndex, phases) : i18n.t('skeleton.preview');
       ctx.fillText(label, 8, 20);
     };
 

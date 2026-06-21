@@ -1,16 +1,20 @@
 import type { Handedness, PoseFrame, Phases } from '../types';
 import type { Finding, RuleResult } from '../rules/types';
 import { smooth } from './smooth';
-import { detectPhases, ServeNotRecognizedError } from './detectPhases';
+import { detectPhases, ServeNotRecognizedError, type ServeRejectDetail } from './detectPhases';
 import { buildPhaseContext } from './buildPhaseContext';
 import { runRules, runRulesReport } from './runRules';
 import { ruleC3 } from '../rules/ruleC3';
 import { extractPoses, type PoseModel } from './extractPoses';
 import { MAX_CLIP_SECONDS } from '../constants/biomechanics';
 
+// `serve-not-recognized` carries a machine-readable detail ({ code, params })
+// that the UI translates via t(). The other kinds surface raw dev strings
+// (stack traces, low-level messages) under the "Detail:" line, so `detail`
+// stays open to both shapes.
 export type AnalysisError =
   | { kind: 'pose-extraction-failed'; detail: string }
-  | { kind: 'serve-not-recognized'; detail: string }
+  | { kind: 'serve-not-recognized'; detail: ServeRejectDetail }
   | { kind: 'analysis-failed'; detail: string }
   | { kind: 'video-too-long'; detail: string };
 
@@ -53,14 +57,14 @@ export async function analyzeServe(
   try {
     raw = await deps.extract(video, onProgress, options.model);
   } catch (e) {
-    console.error('[analyzeServe] извлечение поз упало:', e);
+    console.error('[analyzeServe] pose extraction failed:', e);
     return { ok: false, error: { kind: 'pose-extraction-failed', detail: String(e) }, poses: [] };
   }
 
   // Diagnostics: how much usable pose data did MediaPipe actually yield.
   console.info(
-    `[analyzeServe] извлечено кадров с полным скелетом: ${raw.poses.length}, fps≈${raw.fps.toFixed(1)}, ` +
-    `длительность видео ${video.duration.toFixed(1)}с, handedness=${handedness}`,
+    `[analyzeServe] frames with full skeleton extracted: ${raw.poses.length}, fps≈${raw.fps.toFixed(1)}, ` +
+    `video duration ${video.duration.toFixed(1)}s, handedness=${handedness}`,
   );
 
   let smoothed: PoseFrame[] = [];
@@ -76,13 +80,13 @@ export async function analyzeServe(
     return { ok: true, phases, findings, ruleResults, poses: smoothed };
   } catch (e) {
     if (e instanceof ServeNotRecognizedError) {
-      console.warn('[analyzeServe] подача не распознана:', e.detail);
+      console.warn('[analyzeServe] serve not recognized:', e.detail);
       return { ok: false, error: { kind: 'serve-not-recognized', detail: e.detail }, poses: smoothed };
     }
     // A bug in smooth/detectPhases/buildPhaseContext/runRules — distinct from
     // pose extraction (which already succeeded by this point). Surfacing it as
     // pose-extraction-failed would mislead users and hide the real culprit.
-    console.error('[analyzeServe] ошибка в анализе:', e);
+    console.error('[analyzeServe] analysis error:', e);
     return { ok: false, error: { kind: 'analysis-failed', detail: String(e) }, poses: smoothed };
   }
 }

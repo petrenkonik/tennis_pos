@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import i18n from '../i18n';
 import { ruleC3 } from './ruleC3';
 import type { PhaseContext, Confidence } from '../types';
 
@@ -37,7 +38,11 @@ describe('ruleC3 (insufficient knee bend)', () => {
   it('fills a Layer-2 metric without anatomical jargon in advice', () => {
     const f = ruleC3.check(makeCtx(175))!;
     expect(f.metric?.value).toBe(175);
-    expect(f.advice).not.toMatch(/ротаци|пронаци|анатом/i);
+    // Advice is an i18n key; resolve to English and check the wording stays
+    // anatomy-free (no rotation/pronation jargon) — the Layer-1 invariant.
+    expect(f.advice).toBe('rules.C3.advice');
+    const adviceText = i18n.t(f.advice);
+    expect(adviceText).not.toMatch(/rotation|pronation|anatom/i);
   });
 
   describe('evaluate (full report row)', () => {

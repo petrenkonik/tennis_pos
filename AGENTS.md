@@ -1,99 +1,102 @@
-# AGENTS.md — Инструкции для ИИ-агентов
+# AGENTS.md — Instructions for AI Agents
 
-> Этот файл — точка входа. Прочитай его **целиком** перед началом любой работы в проекте.
+> This file is the entry point. Read it **in full** before starting any work in the project.
 
-## Что это за проект
+## What this project is
 
-**tennis_pos** — веб-прототип приложения для анализа подачи в теннисе. Пользователь (любитель 3.0–4.0) загружает видео своей подачи, приложение:
+**tennis_pos** is a web prototype of an app for analyzing the tennis serve. A user (a recreational player, level 3.0–4.0) uploads a video of their serve, and the app:
 
-1. Распознаёт позу (pose tracking) через MediaPipe
-2. Разбивает подачу на **фазы** по ключевым событиям
-3. Находит **ошибки в движении** через rule-based правила
-4. Показывает фидбек на трёх уровнях глубины (опционально):
-   - **Слой 1** (по умолчанию): простые понятные советы по фазам
-   - **Слой 2**: точные метрики биомеханики (углы суставов, высота подброса)
-   - **Слой 3**: сравнение скелета с эталоном про-игрока
+1. Recognizes the pose (pose tracking) via MediaPipe
+2. Splits the serve into **phases** by key events
+3. Finds **movement errors** via rule-based rules
+4. Shows feedback at three depth levels (optionally):
+   - **Layer 1** (default): simple, clear per-phase tips
+   - **Layer 2**: precise biomechanics metrics (joint angles, toss height)
+   - **Layer 3**: comparing the skeleton against a pro reference
 
-Цель прототипа — **валидировать, что CV-пайплайн реально умеет разбивать подачу на фазы и находить ошибки**, а не сделать красивый UI.
+The goal of the prototype is to **validate that the CV pipeline can actually split a serve into phases and find errors**, not to ship a polished UI.
 
-## Текущий статус
+## Current status
 
-- 🟡 **Исследование завершено** — см. `docs/research/`
-- 🟡 **Архитектурные решения зафиксированы** — см. `docs/decisions/`
-- 🔴 **Реализация не начата** — спецификация (design doc) ещё дорабатывается
-- Кодовая база пока **пустая**
+- 🟢 **Research is done** — see `docs/research/`
+- 🟢 **Architecture decisions are locked** — see `docs/decisions/`
+- 🟢 **MVP CV pipeline is implemented** in `src/` (end-to-end flow: video → pose → phases → rules → UI, rule C3, bilingual UI)
 
-Сначала должна быть завершена спецификация в `docs/superpowers/specs/`, затем план реализации через skill `writing-plans`, и только потом — код.
+First the spec is finished in `docs/superpowers/specs/`, then the implementation plan via the `writing-plans` skill, and only then — code.
 
-## 🔒 Зафиксированные решения (НЕ пересматривать без явного запроса пользователя)
+## 🔒 Locked decisions (do NOT revisit without an explicit user request)
 
-Эти решения уже приняты совместно с пользователем. Не предлагай альтернативы «просто так» — если видишь проблему, укажи на неё конкретно, но не откатывай решение молча.
+These decisions have already been made jointly with the user. Don't propose alternatives "just because" — if you see a problem, point it out specifically, but don't silently roll a decision back.
 
-| Решение | Значение | Обоснование |
+| Decision | Value | Rationale |
 |---|---|---|
-| Целевая аудитория | Любители 3.0–4.0 | Самый массовый рынок; фидбек должен быть без анатомии |
-| Платформа прототипа | Веб (в браузере) | Быстрая итерация алгоритмов без боли мобильной интеграции |
-| Стек CV | MediaPipe JS / TF.js (полностью on-device) | Zero серверной инфраструктуры; приближает к финальному мобильному UX |
-| Источник видео | Загрузка видео-файла | Проще контролировать условия; нет real-time ограничений |
-| Подход к анализу | **Rule-based анализ фаз** (Подход A) | Детерминированный, объяснимый, полностью в браузере, без датасета |
-| Глубина анализа | 3 опциональных слоя | Не отпугнуть новичка, дать глубину продвинутым |
-| LLM-объяснения | **Отложено (future-work)** | Хороший кандидат, но не на прототип |
+| Target audience | Recreational players 3.0–4.0 | The biggest market; feedback must be anatomy-free |
+| Prototype platform | Web (in the browser) | Fast iteration on algorithms without the pain of mobile integration |
+| CV stack | MediaPipe JS / TF.js (fully on-device) | Zero server infrastructure; closer to the final mobile UX |
+| Video source | Video-file upload | Easier to control conditions; no real-time constraints |
+| Analysis approach | **Rule-based phase analysis** (Approach A) | Deterministic, explainable, fully in the browser, no dataset |
+| Analysis depth | 3 optional layers | Don't scare a beginner, give depth to the advanced user |
+| LLM explanations | **Deferred (future-work)** | A good candidate, but not for the prototype |
+| Language | **English docs + bilingual (en/ru) UI** | All docs and code comments in English; the UI is bilingual via `react-i18next` with browser auto-detect + a manual EN/РУ toggle |
 
-Подробности: `docs/decisions/`.
+Details: `docs/decisions/`.
 
-## Структура проекта
+## Project structure
 
 ```
 tennis_pos/
-├── AGENTS.md                  ← ты здесь
-├── README.md                  ← обзор для людей
+├── AGENTS.md                  ← you are here
+├── README.md                  ← overview for humans
 ├── docs/
-│   ├── research/              ← исследование рынка и технологий
-│   ├── biomechanics/          ← предметная область: фазы подачи, метрики
-│   ├── decisions/             ← ADR — архитектурные решения
-│   ├── task-rules.md          ← правила работы с задачами (ОБЯЗАТЕЛЬНО к прочтению)
-│   └── superpowers/specs/     ← спецификации (design docs)
-├── skills/                    ← предметные скиллы (доменные знания)
+│   ├── research/              ← market and technology research
+│   ├── biomechanics/          ← domain: serve phases, metrics
+│   ├── decisions/             ← ADR — architecture decisions
+│   ├── task-rules.md          ← task workflow rules (MUST read)
+│   └── superpowers/specs/     ← specifications (design docs)
+├── skills/                    ← domain skills (subject-matter knowledge)
 │   ├── tennis-serve-phases/
 │   ├── cv-pose-estimation/
 │   └── serve-error-detection/
-└── src/                       ← код (пока пусто)
+└── src/                       ← code (MVP CV pipeline + bilingual UI)
+    ├── i18n/                  ← react-i18next setup + locale catalogs (en/ru)
+    ├── pipeline/, rules/, pose/, constants/, ui/
 ```
 
-## 🧠 Предметные знания — ЧИТАЙ перед работой над алгоритмами
+## 🧠 Subject-matter knowledge — READ before working on algorithms
 
-Любая задача, связанная с фазами, позами, метриками или ошибками, требует контекста. Эти скиллы — сжатая доменная экспертиза. Читай нужный **перед** реализацией:
+Any task involving phases, poses, metrics, or errors needs context. These skills are compressed domain expertise. Read the relevant one **before** implementing:
 
-| Скилл | Когда читать |
+| Skill | When to read |
 |---|---|
-| `skills/tennis-serve-phases/SKILL.md` | Работа с разбиением подачи на фазы, детекцией ключевых событий (release, trophy, contact, follow-through) |
-| `skills/cv-pose-estimation/SKILL.md` | Работа с MediaPipe Pose: индексы 33 landmarks, расчёт углов суставов, сглаживание траекторий |
-| `skills/serve-error-detection/SKILL.md` | Реализация rule-based правил поиска ошибок, пороги, формулировки советов для любителя |
+| `skills/tennis-serve-phases/SKILL.md` | Work on splitting a serve into phases, detecting key events (release, trophy, contact, follow-through) |
+| `skills/cv-pose-estimation/SKILL.md` | Work with MediaPipe Pose: the 33 landmark indices, joint-angle calculation, trajectory smoothing |
+| `skills/serve-error-detection/SKILL.md` | Implementing rule-based error rules, thresholds, advice wording for a recreational user |
 
-Подробный референс биомеханики: `docs/biomechanics/serve-phases.md`.
+Detailed biomechanics reference: `docs/biomechanics/serve-phases.md`.
 
-## 📋 Правила работы с задачами
+## 📋 Task workflow rules
 
-**Обязательно прочитай `docs/task-rules.md` перед началом любой задачи.** Краткая выжимка:
+**Read `docs/task-rules.md` in full before starting any task.** Quick summary:
 
-1. **Сначала спецификация, потом код.** Любая фича идёт через design doc → план → реализация.
-2. **Не пиши код в спеке.** Спека описывает что и зачем, а не как.
-3. **TDD для алгоритмического ядра.** Детекция фаз и поиск ошибок — это чистые функции, их покрываем тестами первыми.
-4. **Всё в браузере.** Никаких серверных вызовов, API-ключей, бэкенда. Если задача требует сервера — остановись и спроси.
-5. **Объяснимость превыше точности.** Лучше правило, которое можно объяснить, чем чёрный ящик.
-6. **Документируй пороги.** Любой магический порог (угол 15°, таймстамп) должен быть именованной константой с комментарием-источником.
+1. **Spec first, then code.** Any feature goes design doc → plan → implementation.
+2. **No code in the spec.** A spec describes what and why, not how.
+3. **TDD for the algorithmic core.** Phase detection and error finding are pure functions — cover them with tests first.
+4. **Everything in the browser.** No server calls, API keys, or backend. If a task needs a server — stop and ask.
+5. **Explainability over accuracy.** A rule you can explain is better than a black box.
+6. **Document thresholds.** Any magic threshold (15° angle, timestamp) must be a named constant with a source comment.
+7. **Language policy.** All docs and code comments are in **English**. The UI is **bilingual (en/ru)** via `react-i18next` — every user-facing string lives in `src/i18n/locales/{en,ru}.json`. Default locale is auto-detected from `navigator.language` (`ru*` → RU, otherwise EN); a manual EN/РУ toggle overrides it, persisted in `localStorage`. When adding a rule: its `title`, `metric.name`, and `advice` must be **i18n keys** (never display strings) and must be added to both locale files.
 
-## Окружение
+## Environment
 
 - **OS:** Windows (win32)
 - **Shell:** `cmd.exe`
-- **Git:** репозиторий ещё **не инициализирован**. Не делай `git init` без запроса пользователя.
-- **Рабочая директория:** `E:\work\startups\tennis_pos`
+- **Git:** initialized, on branch `master`. Don't run `git init`.
+- **Working directory:** `E:\work\startups\tennis_pos`
 
-## Чек-лист перед началом задачи
+## Checklist before starting a task
 
-- [ ] Прочитан `AGENTS.md` (этот файл)
-- [ ] Прочитан `docs/task-rules.md`
-- [ ] Прочитан релевантный скилл из `skills/`
-- [ ] Есть спецификация или задача в `docs/superpowers/specs/` (или задача маленькая и явно тривиальная)
-- [ ] Понятно, какой слой анализа (1/2/3) затрагивается
+- [ ] Read `AGENTS.md` (this file)
+- [ ] Read `docs/task-rules.md`
+- [ ] Read the relevant skill from `skills/`
+- [ ] There is a spec or task in `docs/superpowers/specs/` (or the task is small and obviously trivial)
+- [ ] It's clear which analysis layer (1/2/3) is affected

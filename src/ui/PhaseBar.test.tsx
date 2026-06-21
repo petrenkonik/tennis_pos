@@ -13,7 +13,7 @@ const phases: Phases = {
 describe('PhaseBar', () => {
   it('labels all four phases', () => {
     render(<PhaseBar phases={phases} />);
-    for (const label of ['Подготовка', 'Трофей', 'Разгон', 'Завершение']) {
+    for (const label of ['Preparation', 'Trophy', 'Acceleration', 'Follow-through']) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
   });

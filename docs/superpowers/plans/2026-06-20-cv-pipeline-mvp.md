@@ -934,7 +934,7 @@ describe('ruleC3 (insufficient knee bend)', () => {
   it('fills a Layer-2 metric without anatomical jargon in advice', () => {
     const f = ruleC3.check(makeCtx(175))!;
     expect(f.metric?.value).toBe(175);
-    expect(f.advice).not.toMatch(/ротаци|пронаци|анатом/i);
+    expect(f.advice).not.toMatch(/rotation|pronation|anatomy/i);
   });
 });
 ```
@@ -976,7 +976,7 @@ export const ruleC3: ErrorRule = {
   id: 'C3',
   phase: 'trophy',
   layer: 1,
-  title: 'Сгиб коленей',
+  title: 'Knee bend',
   check: (ctx) => {
     const angle = ctx.metrics.kneeFlexionAtTrophyDeg;
     if (Number.isNaN(angle)) return null;
@@ -989,10 +989,10 @@ export const ruleC3: ErrorRule = {
       severity,
       confidence: ctx.phases.confidence,
       advice:
-        'Колени согнуты слабо — ноги почти не дают энергию удару. ' +
-        'Сгибайте колени глубже в позиции «трофей», чтобы вытолкнуться вверх к мячу.',
+        'Knees are barely bent — the legs contribute almost no energy to the hit. ' +
+        'Bend the knees deeper in the "trophy" position to push upward toward the ball.',
       metric: {
-        name: 'Сгиб колена в «трофей»',
+        name: 'Knee flexion at "trophy"',
         value: Math.round(angle),
         unit: '°',
         referenceRange: KNEE_FLEXION_NORMAL_RANGE_DEG,
@@ -1381,18 +1381,18 @@ import type { Finding } from '../rules/types';
 
 const finding: Finding = {
   ruleId: 'C3', severity: 'warn', confidence: 'low',
-  advice: 'Сгибайте колени глубже.',
+  advice: 'Bend your knees deeper.',
 };
 
 describe('AdviceList', () => {
   it('renders findings with a low-confidence badge', () => {
     render(<AdviceList findings={[finding]} />);
-    expect(screen.getByText('Сгибайте колени глубже.')).toBeInTheDocument();
-    expect(screen.getByText(/возможно/i)).toBeInTheDocument();
+    expect(screen.getByText('Bend your knees deeper.')).toBeInTheDocument();
+    expect(screen.getByText(/maybe/i)).toBeInTheDocument();
   });
   it('shows an empty-state message when there are no findings', () => {
     render(<AdviceList findings={[]} />);
-    expect(screen.getByText(/ошибок не найдено/i)).toBeInTheDocument();
+    expect(screen.getByText(/no errors found/i)).toBeInTheDocument();
   });
 });
 ```
@@ -1414,7 +1414,7 @@ const phases: Phases = {
 describe('PhaseBar', () => {
   it('labels all four phases', () => {
     render(<PhaseBar phases={phases} />);
-    for (const label of ['Подготовка', 'Трофей', 'Разгон', 'Завершение']) {
+    for (const label of ['Preparation', 'Trophy', 'Acceleration', 'Follow-through']) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
   });
@@ -1435,14 +1435,14 @@ const SEVERITY_ICON: Record<Finding['severity'], string> = { error: '⛔', warn:
 
 export function AdviceList({ findings }: { findings: Finding[] }) {
   if (findings.length === 0) {
-    return <p className="advice-empty">Ошибок не найдено — хорошая подача!</p>;
+    return <p className="advice-empty">No errors found — nice serve!</p>;
   }
   return (
     <ul className="advice-list">
       {findings.map((f, i) => (
         <li key={i} className={`advice advice--${f.severity}`}>
           <strong>{SEVERITY_ICON[f.severity]} {f.ruleId}</strong>
-          <p>{f.confidence === 'low' ? 'Возможно: ' : ''}{f.advice}</p>
+          <p>{f.confidence === 'low' ? 'Maybe: ' : ''}{f.advice}</p>
         </li>
       ))}
     </ul>
@@ -1456,10 +1456,10 @@ export function AdviceList({ findings }: { findings: Finding[] }) {
 import type { Phases } from '../types';
 
 const LABELS: Array<[keyof Phases['phases'], string]> = [
-  ['preparation', 'Подготовка'],
-  ['trophy', 'Трофей'],
-  ['acceleration', 'Разгон'],
-  ['followThrough', 'Завершение'],
+  ['preparation', 'Preparation'],
+  ['trophy', 'Trophy'],
+  ['acceleration', 'Acceleration'],
+  ['followThrough', 'Follow-through'],
 ];
 
 export function PhaseBar({ phases }: { phases: Phases }) {
@@ -1499,10 +1499,10 @@ const BONES: Array<[number, number]> = [
 
 function phaseAt(frameIndex: number, phases: Phases): string {
   const p = phases.phases;
-  if (frameIndex < p.preparation[1]) return 'Подготовка';
-  if (frameIndex < p.acceleration[0]) return 'Трофей';
-  if (frameIndex < p.acceleration[1]) return 'Разгон';
-  return 'Завершение';
+  if (frameIndex < p.preparation[1]) return 'Preparation';
+  if (frameIndex < p.acceleration[0]) return 'Trophy';
+  if (frameIndex < p.acceleration[1]) return 'Acceleration';
+  return 'Follow-through';
 }
 
 export function SkeletonOverlay(
@@ -1563,9 +1563,9 @@ import './App.css';
 type Status = 'idle' | 'processing' | 'done' | 'error';
 
 const ERROR_TEXT: Record<string, string> = {
-  'video-too-long': 'Видео длиннее 30 секунд. Загрузите короткий клип одной подачи.',
-  'serve-not-recognized': 'Не удалось распознать подачу. Снимите сбоку, игрок целиком в кадре.',
-  'pose-extraction-failed': 'Не удалось запустить распознавание. Попробуйте другой браузер/файл.',
+  'video-too-long': 'Video is longer than 30 seconds. Upload a short clip of a single serve.',
+  'serve-not-recognized': 'Could not recognize the serve. Shoot from the side, with the player fully in frame.',
+  'pose-extraction-failed': 'Could not start pose recognition. Try a different browser/file.',
 };
 
 export default function App() {
@@ -1601,20 +1601,20 @@ export default function App() {
 
   return (
     <main className="app">
-      <h1>Анализ подачи</h1>
+      <h1>Serve Analysis</h1>
       <div className="controls">
         <input type="file" accept="video/*" onChange={onFile} />
         <label>
           <input
             type="radio" name="hand" checked={handedness === 'right'}
             onChange={() => setHandedness('right')}
-          /> Правша
+          /> Right-handed
         </label>
         <label>
           <input
             type="radio" name="hand" checked={handedness === 'left'}
             onChange={() => setHandedness('left')}
-          /> Левша
+          /> Left-handed
         </label>
       </div>
 
@@ -1625,7 +1625,7 @@ export default function App() {
         )}
       </div>
 
-      {status === 'processing' && <p>Обработка: {Math.round(progress * 100)}%</p>}
+      {status === 'processing' && <p>Processing: {Math.round(progress * 100)}%</p>}
       {status === 'error' && <p className="error">{errorMsg}</p>}
 
       {status === 'done' && result?.ok && (
@@ -1736,22 +1736,22 @@ Expected: PASS.
 
 Append to `README.md`:
 ```markdown
-## Запуск прототипа
+## Running the prototype
 
 ```bash
 npm install
-npm run dev      # открыть указанный localhost-адрес
-npm test         # прогнать тесты ядра
+npm run dev      # open the printed localhost address
+npm test         # run the core tests
 ```
 
-### Ручная проверка сквозного потока (критерий успеха MVP)
-1. `npm run dev`, открыть приложение.
-2. Выбрать клип подачи (сбоку, игрок целиком в кадре, ≤30с) и handedness.
-3. Дождаться прогресс-бара обработки.
-4. Убедиться, что:
-   - на видео рисуется скелет и подпись текущей фазы;
-   - полоса фаз показывает 4 сегмента (Подготовка/Трофей/Разгон/Завершение);
-   - показан ≥1 совет либо «Ошибок не найдено».
+### Manual check of the end-to-end flow (MVP success criterion)
+1. `npm run dev`, open the app.
+2. Pick a serve clip (side view, player fully in frame, ≤30s) and handedness.
+3. Wait for the processing progress bar.
+4. Verify that:
+   - a skeleton and the current-phase label are drawn over the video;
+   - the phase bar shows 4 segments (Preparation/Trophy/Acceleration/Follow-through);
+   - at least one piece of advice or a "No errors found" message is shown.
 ```
 
 - [ ] **Step 4: Manual verification on the real clip**

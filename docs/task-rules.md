@@ -1,142 +1,147 @@
-# Правила работы с задачами
+# Task Workflow Rules
 
-> Эти правила действуют для **всех** задач в проекте. Сначала прочитай этот файл, потом приступай к работе.
+> These rules apply to **every** task in the project. Read this file first, then start work.
 
-## 1. Принцип: спецификация → план → код
+## 1. Principle: specification → plan → code
 
-Каждая нетривиальная задача проходит три фазы:
+Every non-trivial task goes through three phases:
 
-1. **Спецификация** — что строим и зачем. Лежит в `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md`. Описывает поведение, интерфейсы, метрики успеха. **Без кода.**
-2. **План** — как строим, по шагам. Создаётся через skill `writing-plans`.
-3. **Реализация** — сам код, по плану.
+1. **Specification** — what we are building and why. Lives in `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md`. Describes behavior, interfaces, success metrics. **No code.**
+2. **Plan** — how we build it, step by step. Created via the `writing-plans` skill.
+3. **Implementation** — the code itself, following the plan.
 
-### Что считается «тривиальным» и не требует спеки
+### What counts as "trivial" and needs no spec
 
-- Опечатка в комментарии/документации
-- Переименование переменной
-- Добавление отсутствующего импорта
-- Форматирование
+- A typo in a comment/doc
+- Renaming a variable
+- Adding a missing import
+- Formatting
 
-Всё остальное — через спеку. Если сомневаешься, считай что нужна.
+Everything else goes through a spec. When in doubt, assume one is needed.
 
-## 2. Дизайн-документ (спека)
+## 2. Design document (spec)
 
-### Структура спеки
+### Spec structure
 
 ```markdown
-# <Название фичи>
+# <Feature name>
 
-## Контекст
-Зачем это нужно. Ссылка на родительскую спеку / проблему.
+## Context
+Why this matters. Link to parent spec / problem.
 
-## Цели / Не цели
-- Цель: ...
-- Не цель: ...
+## Goals / Non-goals
+- Goal: ...
+- Non-goal: ...
 
-## Архитектура
-Как устроено. Диаграмма или схема потока данных.
+## Architecture
+How it is structured. Diagram or data-flow sketch.
 
-## Интерфейсы
-Входы/выходы ключевых функций (сигнатуры, типы).
+## Interfaces
+Inputs/outputs of key functions (signatures, types).
 
-## Метрики успеха
-Как поймём, что работает. Конкретно и измеримо.
+## Success metrics
+How we will know it works. Concrete and measurable.
 
-## Риски / открытые вопросы
-Что может пойти не так.
+## Risks / open questions
+What could go wrong.
 ```
 
-### Правила
+### Rules
 
-- **Без кода реализации.** Допустимы сигнатуры функций и примеры структур данных, но не тела.
-- **Каждое решение обосновано.** «Делаем X потому что Y».
-- **Альтернативы упомянуты.** Если было несколько вариантов, кратко укажи почему выбран этот.
-- **Метрики успеха конкретные.** Не «работает хорошо», а «детектирует trophy position в ±2 кадра от размеченного на тестовом наборе из ≥5 подач».
+- **No implementation code.** Function signatures and data-structure examples are fine; bodies are not.
+- **Every decision is justified.** "We do X because Y."
+- **Alternatives are mentioned.** If there were several options, briefly state why this one was chosen.
+- **Success metrics are concrete.** Not "works well" but "detects the trophy position within ±2 frames of the labeled one on a test set of ≥5 serves".
 
-## 3. TDD для алгоритмического ядра
+## 3. TDD for the algorithmic core
 
-Детекция фаз, расчёт углов, поиск ошибок — это **чистые функции** от данных позы. Их покрываем тестами:
+Phase detection, angle calculation, error finding — these are **pure functions** of pose data. Cover them with tests:
 
-1. Пишем тест на конкретный случай (напр. «trajectory с пиком высоты мяча на кадре N → детектируется contact на кадре N»)
-2. Пишем минимальную реализацию
-3. Рефакторим
+1. Write a test for a specific case (e.g. "a trajectory with a ball-height peak on frame N → contact detected on frame N")
+2. Write the minimal implementation
+3. Refactor
 
-### Тестовые данные
+### Test data
 
-- Тестовые видео / позы кладём в `src/__tests__/fixtures/` (или аналогичное)
-- Для unit-тестов используем **синтетические данные позы** (генерируем массив кейпоинтов с известной фазой), а не реальные видео — это даёт детерминированность
-- Реальные видео — только для интеграционных/ручных проверок
+- Put test videos / poses in `src/__tests__/fixtures/` (or similar)
+- For unit tests use **synthetic pose data** (generate a keypoint array with a known phase), not real videos — this gives determinism
+- Real videos — only for integration / manual checks
 
-## 4. Всё в браузере
+## 4. Everything in the browser
 
-Принцип: **zero серверной инфраструктуры на прототипе.**
+Principle: **zero server infrastructure in the prototype.**
 
-- ❌ Никаких API-вызовов к внешним сервисам (кроме загрузки MediaPipe model weights из CDN — это допустимо)
-- ❌ Никакого бэкенда, баз данных, авторизации
-- ❌ Никаких секретов/API-ключей в коде
-- ✅ Вся обработка — в браузере через MediaPipe / TF.js
+- ❌ No API calls to external services (loading MediaPipe model weights from a CDN is allowed)
+- ❌ No backend, databases, auth
+- ❌ No secrets / API keys in code
+- ✅ All processing — in the browser via MediaPipe / TF.js
 
-**Если задача требует сервера — остановись и спроси пользователя.** Это нарушение зафиксированного решения.
+**If a task needs a server — stop and ask the user.** That violates a locked decision.
 
-## 5. Объяснимость превыше точности
+## 5. Explainability over accuracy
 
-Мы строим **rule-based** систему (см. `docs/decisions/0002-rule-based-approach.md`). Это сознательный выбор. Правила:
+We are building a **rule-based** system (see `docs/decisions/0002-rule-based-approach.md`). This is a deliberate choice. Rules:
 
-- Каждое правило ошибки должно быть **объяснимо** — пользователь-любитель должен понять «почему это ошибка» без анатомии.
-- Если правило ловит много false positives и его нельзя объяснить просто — пересматриваем правило, а не добавляем ML.
-- **Избегаем чёрных ящиков** на прототипе. ML-классификаторы и LLM — это future-work, явно зафиксированное как отложенное.
+- Every error rule must be **explainable** — a recreational user must understand "why this is an error" without anatomy.
+- If a rule produces many false positives and cannot be explained simply, revise the rule rather than adding ML.
+- **Avoid black boxes** in the prototype. ML classifiers and LLMs are explicitly deferred future-work.
 
-## 6. Документируй пороги и магические числа
+## 6. Document thresholds and magic numbers
 
-Любой числовой порог (угол, таймстамп, расстояние) должен быть:
+Any numeric threshold (angle, timestamp, distance) must be:
 
-- **Именованной константой**, не магическим литералом в коде
-- Снабжён **комментарием-источником**: откуда значение (статья, эмпирически, оценка тренера)
+- A **named constant**, not a magic literal in code
+- Annotated with a **source comment**: where the value comes from (paper, empirically, coach estimate)
 
 ```typescript
-// Хорошо
+// Good
 // Chow et al. (2012): trophy position typically reaches knee flexion 20-35°
 // among intermediate players. Tolerance zone covers observed range.
 const TROPHY_KNEE_FLEXION_MIN_DEG = 20;
 const TROPHY_KNEE_FLEXION_MAX_DEG = 35;
 
-// Плохо
-if (angle < 25) { ... }  // откуда 25?
+// Bad
+if (angle < 25) { ... }  // where does 25 come from?
 ```
 
-Пороги собираем в одном месте — `src/constants/biomechanics.ts` (или аналогичном).
+Collect thresholds in one place — `src/constants/biomechanics.ts` (or similar).
 
-## 7. Структура коммитов
+## 7. Commit structure
 
-(Когда git будет инициализирован — пока репозитория нет)
+Format: `<type>: <description>`
 
-Формат: `<type>: <description>`
+- `feat:` new feature
+- `fix:` bugfix
+- `docs:` documentation only
+- `test:` tests only
+- `refactor:` refactor with no behavior change
+- `chore:` build, deps, config
 
-- `feat:` новая фича
-- `fix:` багфикс
-- `docs:` только документация
-- `test:` только тесты
-- `refactor:` рефакторинг без изменения поведения
-- `chore:` сборка, зависимости, конфиг
+Example: `feat(phases): detect trophy position from knee flexion peak`
 
-Пример: `feat(phases): detect trophy position from knee flexion peak`
+## 8. Language policy
 
-## 8. Слои анализа — всегда указывай
+- All documentation and code comments are written in **English**.
+- The app UI is **bilingual (en/ru)** via `react-i18next`. Every user-facing string lives in `src/i18n/locales/{en,ru}.json` — no inline literals in components.
+- Default locale is auto-detected from `navigator.language` (anything `ru*` → RU, otherwise EN); a manual EN/РУ toggle overrides it, persisted in `localStorage`.
+- When adding a rule: its `title`, `metric.name`, and `advice` must be **i18n keys**, never display strings. Add the keys to both locale files.
 
-Любая задача по анализу должна явно указывать, какой **слой глубины** она затрагивает:
+## 9. Analysis layers — always state which
 
-- **Слой 1 — Простые советы** (по умолчанию для всех). Понятный текст без терминов.
-- **Слой 2 — Точные метрики.** Углы в градусах, высота в см, отклонения от эталона.
-- **Слой 3 — Сравнение с эталоном.** Overlaid skeleton пользователя vs про-игрок.
+Any analysis task must explicitly state which **depth layer** it touches:
 
-Фича может покрывать несколько слоёв, но это должно быть явно в спеке.
+- **Layer 1 — Simple advice** (default for everyone). Plain text, no jargon.
+- **Layer 2 — Precise metrics.** Angles in degrees, heights in cm, deviations from a reference.
+- **Layer 3 — Comparison with a reference.** Overlaid user skeleton vs. a pro player.
 
-## 9. Чек-лист перед завершением задачи
+A feature may cover several layers, but that must be explicit in the spec.
 
-- [ ] Спека написана и одобрена (если требовалась)
-- [ ] Тесты написаны для алгоритмического кода
-- [ ] Нет серверных вызовов / API-ключей / секретов
-- [ ] Магические числа вынесены в именованные константы с источником
-- [ ] Затронутый слой анализа указан в спеке/коммите
-- [ ] Документация (`docs/`) обновлена, если изменилось поведение
-- [ ] Скиллы (`skills/`) обновлены, если изменилась доменная модель
+## 10. Checklist before finishing a task
+
+- [ ] Spec written and approved (if required)
+- [ ] Tests written for algorithmic code
+- [ ] No server calls / API keys / secrets
+- [ ] Magic numbers moved to named constants with a source
+- [ ] Affected analysis layer stated in the spec/commit
+- [ ] Documentation (`docs/`) updated if behavior changed
+- [ ] Skills (`skills/`) updated if the domain model changed

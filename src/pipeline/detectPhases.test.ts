@@ -45,7 +45,13 @@ describe('detectPhases', () => {
   it('reports which joint is most often invisible in the rejection detail', () => {
     const poses = Array.from({ length: 6 }, (_, i) =>
       makeFrame(i, makeLandmarks({ [LM.R_KNEE]: { visibility: 0 } })));
-    expect(() => detectPhases(poses, 'right')).toThrow(/правое колено — 100% кадров/);
+    let caught: unknown;
+    try { detectPhases(poses, 'right'); } catch (e) { caught = e; }
+    expect(caught).toBeInstanceOf(ServeNotRecognizedError);
+    const err = caught as ServeNotRecognizedError;
+    expect(err.detail.code).toBe('low-visibility');
+    const worst = err.detail.params.worst as Array<{ key: string; pct: number }>;
+    expect(worst[0]).toEqual({ key: 'right-knee', pct: 100 });
   });
 
   it('visibilityBreakdown ranks the worst-visibility critical landmarks first', () => {
@@ -54,8 +60,8 @@ describe('detectPhases', () => {
       makeFrame(1, makeLandmarks({ [LM.R_KNEE]: { visibility: 0 } })),
     ];
     const bd = visibilityBreakdown(poses);
-    expect(bd[0]).toEqual({ name: 'правое колено', lowFrac: 1 });
-    expect(bd.find(b => b.name === 'левое запястье')?.lowFrac).toBe(0.5);
+    expect(bd[0]).toEqual({ key: 'right-knee', lowFrac: 1 });
+    expect(bd.find(b => b.key === 'left-wrist')?.lowFrac).toBe(0.5);
   });
 
   it('marks low confidence when follow-through is never reached', () => {

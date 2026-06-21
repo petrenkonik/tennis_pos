@@ -8,10 +8,19 @@ import {
   DIAGNOSTIC_MIN_LOW_FRAC, TROPHY_OVERHEAD_REF_LM,
 } from '../constants/biomechanics';
 
+// Machine-readable diagnostic codes that the UI (App.tsx) resolves via t().
+// Never embed display strings here — the detection layer is locale-agnostic.
+export type ServeRejectCode = 'too-few-frames' | 'low-visibility';
+
+export interface ServeRejectDetail {
+  code: ServeRejectCode;
+  params: Record<string, unknown>;
+}
+
 export class ServeNotRecognizedError extends Error {
-  detail: string;
-  constructor(detail: string) {
-    super(detail);
+  detail: ServeRejectDetail;
+  constructor(detail: ServeRejectDetail) {
+    super(detail.code);
     this.name = 'ServeNotRecognizedError';
     this.detail = detail;
   }
@@ -19,14 +28,14 @@ export class ServeNotRecognizedError extends Error {
 
 const CRITICAL_LM = [LM.L_SHOULDER, LM.R_SHOULDER, LM.L_WRIST, LM.R_WRIST, LM.L_KNEE, LM.R_KNEE];
 
-// Human-readable names for diagnostics (which joint keeps disappearing).
-const CRITICAL_LM_NAMES: Record<number, string> = {
-  [LM.L_SHOULDER]: 'левое плечо',
-  [LM.R_SHOULDER]: 'правое плечо',
-  [LM.L_WRIST]: 'левое запястье',
-  [LM.R_WRIST]: 'правое запястье',
-  [LM.L_KNEE]: 'левое колено',
-  [LM.R_KNEE]: 'правое колено',
+// Stable machine keys for the worst-offender diagnostic (translated in the UI).
+const CRITICAL_LM_KEYS: Record<number, string> = {
+  [LM.L_SHOULDER]: 'left-shoulder',
+  [LM.R_SHOULDER]: 'right-shoulder',
+  [LM.L_WRIST]: 'left-wrist',
+  [LM.R_WRIST]: 'right-wrist',
+  [LM.L_KNEE]: 'left-knee',
+  [LM.R_KNEE]: 'right-knee',
 };
 
 const pct = (x: number) => Math.round(x * 100);
@@ -36,10 +45,10 @@ const pct = (x: number) => Math.round(x * 100);
 export function visibilityBreakdown(
   poses: PoseFrame[],
   visTh: number = VISIBILITY_THRESHOLD,
-): Array<{ name: string; lowFrac: number }> {
+): Array<{ key: string; lowFrac: number }> {
   return CRITICAL_LM
     .map(i => ({
-      name: CRITICAL_LM_NAMES[i],
+      key: CRITICAL_LM_KEYS[i],
       lowFrac: poses.filter(f => f.landmarks[i].visibility < visTh).length / poses.length,
     }))
     .sort((a, b) => b.lowFrac - a.lowFrac);
@@ -84,10 +93,10 @@ export function detectPhases(
   const maxLowVis = gate.maxLowVisFraction ?? MAX_LOW_VIS_FRACTION;
 
   if (poses.length < 2) {
-    throw new ServeNotRecognizedError(
-      `извлечено всего ${poses.length} кадр(ов) с полным скелетом — MediaPipe почти не нашёл фигуру ` +
-      `(игрок слишком мелкий/далеко, плохой свет или сильное размытие).`,
-    );
+    throw new ServeNotRecognizedError({
+      code: 'too-few-frames',
+      params: { n: poses.length },
+    });
   }
 
   // 1) visibility gate
@@ -96,14 +105,17 @@ export function detectPhases(
   if (lowVis / poses.length > maxLowVis) {
     const worst = visibilityBreakdown(poses, visTh)
       .filter(b => b.lowFrac > DIAGNOSTIC_MIN_LOW_FRAC)
-      .map(b => `${b.name} — ${pct(b.lowFrac)}% кадров`)
-      .join(', ');
-    throw new ServeNotRecognizedError(
-      `ключевые суставы не видны на ${pct(lowVis / poses.length)}% из ${poses.length} кадров ` +
-      `(порог отказа — ${pct(maxLowVis)}%, порог видимости ${visTh.toFixed(2)}). ` +
-      `Чаще всего пропадают: ${worst || 'равномерно по всем суставам'}. ` +
-      `Обычно причина — обрезаны кадром (например, ноги/колени) или игрок слишком мелкий.`,
-    );
+      .map(b => ({ key: b.key, pct: pct(b.lowFrac) }));
+    throw new ServeNotRecognizedError({
+      code: 'low-visibility',
+      params: {
+        lowPct: pct(lowVis / poses.length),
+        total: poses.length,
+        maxPct: pct(maxLowVis),
+        visTh: visTh.toFixed(2),
+        worst,
+      },
+    });
   }
 
   const last = poses.length - 1;

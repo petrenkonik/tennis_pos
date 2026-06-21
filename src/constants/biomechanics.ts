@@ -29,17 +29,17 @@ export const DEFAULT_UI_VISIBILITY_THRESHOLD = 0.30;
 export const DEFAULT_UI_MAX_LOW_VIS_FRACTION = 0.85;
 
 // Minimum share of frames a critical landmark must be unreliable in to appear
-// in the "чаще всего пропадают: ..." diagnostic message on the reject path.
+// in the "most often missing: ..." diagnostic message on the reject path.
 // Below this we consider it noise rather than the offending joint.
 export const DIAGNOSTIC_MIN_LOW_FRAC = 0.2;
 
 // Reference landmark used to decide whether the racket is "overhead" at trophy.
-// MediaPipe gives no crown point, so we approximate "выше головы" with a point
+// MediaPipe gives no crown point, so we approximate "above the head" with a point
 // that sits below the crown. `nose` is more lenient (racket needs to clear only
 // the face) and is preferred for noisy amateur footage; switch to shoulders for
 // stricter detection once calibration data exists.
 export const TROPHY_OVERHEAD_REF_LM = 0; // LM.NOSE
-export const TROPHY_OVERHEAD_REF_NAME = 'нос';
+export const TROPHY_OVERHEAD_REF_NAME = 'nose';
 
 // Time-based fallback split when trophy is not expressed (tennis-serve-phases skill).
 export const FALLBACK_PREP_FRACTION = 0.6;

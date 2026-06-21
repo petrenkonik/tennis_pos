@@ -1,88 +1,88 @@
 ---
 name: cv-pose-estimation
-description: Работа с MediaPipe Pose для трекинга позы в теннисе — индексы 33 landmarks, расчёт углов суставов, сглаживание траекторий, обработка visibility. Читай перед работой с pose data, расчётом метрик по скелету, или интеграцией MediaPipe.
+description: Working with MediaPipe Pose for pose tracking in tennis — the 33 landmark indices, joint-angle calculation, trajectory smoothing, and handling of visibility. Read before working with pose data, computing skeleton metrics, or integrating MediaPipe.
 ---
 
-# Скилл: CV Pose Estimation (MediaPipe) для тенниса
+# Skill: CV Pose Estimation (MediaPipe) for Tennis
 
-## Когда использовать
+## When to use
 
-Перед любой задачей, которая:
-- Работает с landmarks позы (точки скелета)
-- Считает углы суставов, расстояния, скорости
-- Интегрирует MediaPipe Pose в код
-- Сглаживает / фильтрует pose-trajectory
+Before any task that:
+- Works with pose landmarks (skeleton points)
+- Computes joint angles, distances, velocities
+- Integrates MediaPipe Pose into code
+- Smooths / filters a pose trajectory
 
 ## MediaPipe Pose: 33 landmarks
 
-MediaPipe BlazePose возвращает **33 landmarks** на кадр, каждый с `{x, y, z, visibility}`.
+MediaPipe BlazePose returns **33 landmarks** per frame, each with `{x, y, z, visibility}`.
 
 ```
  0: nose
- 1-10: face (eyes, ears, mouth)               ← для тенниса почти не нужны
+ 1-10: face (eyes, ears, mouth)               ← barely needed for tennis
 11: left shoulder    12: right shoulder
 13: left elbow       14: right elbow
-15: left wrist       16: right wrist          ← ракеточная/тоссовая рука
-17-22: hands (pinky, index, thumb, kp tips)   ← мелкая моторика, обычно игнорируем
+15: left wrist       16: right wrist          ← racket/toss hand
+17-22: hands (pinky, index, thumb, kp tips)   ← fine motor, usually ignored
 23: left hip         24: right hip
 25: left knee        26: right knee
 27: left ankle       28: right ankle
 29-32: feet
 ```
 
-### Нормализация координат
-- `x, y` — **нормализованные** [0, 1] относительно ширины/высоты кадра
-- `z` — глубина, относительно центра бёдер (меньше = ближе к камере). **Менее надёжна**, используем осторожно
-- `visibility` — [0, 1], вероятность что landmark виден и не окклюдирован. **Критична** для фильтрации
+### Coordinate normalization
+- `x, y` — **normalized** to [0, 1] relative to the frame width/height
+- `z` — depth, relative to the hip center (smaller = closer to the camera). **Less reliable**, use carefully
+- `visibility` — [0, 1], the probability that the landmark is visible and not occluded. **Critical** for filtering
 
-### Какие landmarks важны для тенниса
+### Which landmarks matter for tennis
 
-| Landmark | Зачем |
+| Landmark | Why |
 |---|---|
-| 15, 16 (wrists) | Тоссовая и ракеточная рука; детекция trophy, contact |
-| 13, 14 (elbows) | Угол локтя (выпрямление при контакте) |
-| 11, 12 (shoulders) | Опорные точки для углов руки, ориентация туловища |
-| 23, 24 (hips) | Центр масс, высота прыжка, стабильность |
-| 25, 26 (knees) | Угол сгиба колена (knee bend в trophy) |
-| 0 (nose), 27/28 (ankles) | Ориентиры «голова» и «ноги» для вертикали |
+| 15, 16 (wrists) | Toss and racket hand; trophy/contact detection |
+| 13, 14 (elbows) | Elbow angle (extension at contact) |
+| 11, 12 (shoulders) | Reference points for arm angles, torso orientation |
+| 23, 24 (hips) | Center of mass, jump height, stability |
+| 25, 26 (knees) | Knee flexion angle (knee bend at trophy) |
+| 0 (nose), 27/28 (ankles) | "Head" and "feet" references for the vertical |
 
-## Расчёт углов суставов
+## Computing joint angles
 
-### Угол в суставе (3 точки)
-Угол в точке B для тройки (A, B, C):
+### Angle at a joint (3 points)
+The angle at point B for the triple (A, B, C):
 
 ```typescript
 function jointAngle(a: Point, b: Point, c: Point): number {
-  // Вектора от B к A и от B к C
+  // Vectors from B to A and from B to C
   const ba = { x: a.x - b.x, y: a.y - b.y };
   const bc = { x: c.x - b.x, y: c.y - b.y };
   const cos = (ba.x * bc.x + ba.y * bc.y) /
               (Math.hypot(ba.x, ba.y) * Math.hypot(bc.x, bc.y));
-  // Защита от численных ошибок (cos может чуть выйти за [-1,1])
+  // Guard against numerical error (cos can slightly exceed [-1,1])
   return Math.acos(Math.max(-1, Math.min(1, cos))) * 180 / Math.PI;
 }
 ```
 
-### Полезные углы для тенниса
-- **Knee flexion (сгиб колена):** hip(23/24) → knee(25/26) → ankle(27/28)
-  - 180° = прямая нога, меньше = больше согнут
-- **Elbow extension (локоть):** shoulder(11/12) → elbow(13/14) → wrist(15/16)
-  - 180° = прямая рука (важно для contact)
-- **Shoulder abduction (плечо):** hip → shoulder → elbow (поднята ли рука)
+### Useful angles for tennis
+- **Knee flexion:** hip(23/24) → knee(25/26) → ankle(27/28)
+  - 180° = straight leg, smaller = more bent
+- **Elbow extension:** shoulder(11/12) → elbow(13/14) → wrist(15/16)
+  - 180° = straight arm (important for contact)
+- **Shoulder abduction:** hip → shoulder → elbow (is the arm raised)
 
-### Нюанс с 2D
-- MediaPipe даёт **2D (x,y)** и **z** (глубина)
-- Углы, считаемые в 2D, могут быть **неточны** когда движение в глубину (напр. рука уходит к/от камеры)
-- На прототипе: **полагаемся на 2D-углы**, помечаем что depth неточен; компенсируем tolerance-зонами в правилах (см. serve-error-detection)
+### The 2D nuance
+- MediaPipe gives **2D (x,y)** and **z** (depth)
+- Angles computed in 2D can be **inaccurate** when the motion is in depth (e.g. the arm moves toward/away from the camera)
+- On the prototype: **we rely on 2D angles**, note that depth is inaccurate, and compensate with tolerance zones in the rules (see serve-error-detection)
 
-## Сглаживание траекторий
+## Trajectory smoothing
 
-Pose estimation зашумлена. Прежде чем детектить экстремумы/события — **сглаживаем**.
+Pose estimation is noisy. Before detecting extrema/events — **smooth**.
 
-### Рекомендуемый подход: Moving average (простой и достаточный для прототипа)
+### Recommended approach: moving average (simple and sufficient for the prototype)
 ```typescript
 function smooth(values: number[], windowSize = 5): number[] {
-  // центрированное скользящее среднее
+  // centered moving average
   const out = [];
   const half = Math.floor(windowSize / 2);
   for (let i = 0; i < values.length; i++) {
@@ -97,35 +97,35 @@ function smooth(values: number[], windowSize = 5): number[] {
 }
 ```
 
-### Когда рассматривать Kalman / One-Euro
-- Moving average вводит **задержку** пиков (~windowSize/2 кадров)
-- Для детекции фаз это обычно приемлемо (tolerance ±2 кадра)
-- Если пики «плывут» — переключаемся на **One-Euro filter** (адаптивный, low lag для быстрых движений)
+### When to consider Kalman / One-Euro
+- A moving average introduces a peak **lag** (~windowSize/2 frames)
+- For phase detection this is usually acceptable (tolerance ±2 frames)
+- If peaks "drift" — switch to a **One-Euro filter** (adaptive, low lag for fast motion)
 
-### Что сглаживать
-- Координаты ключевых landmarks (wrists, knees, hips) — да
-- Visibility — нет (это already-фильтрованная уверенность)
-- Производные метрики (углы) — можно считать **после** сглаживания координат, либо сглаживать сами углы. Сначала сглаживать координаты обычно лучше.
+### What to smooth
+- Coordinates of key landmarks (wrists, knees, hips) — yes
+- Visibility — no (it is already a filtered confidence)
+- Derived metrics (angles) — can be computed **after** smoothing the coordinates, or you can smooth the angles themselves. Smoothing coordinates first is usually better.
 
-## Фильтрация по visibility
+## Visibility filtering
 
-Не все landmarks надёжны каждый кадр. Правила:
+Not every landmark is reliable every frame. Rules:
 
-1. **Порог visibility** — если `visibility < THRESHOLD`, помечаем landmark как ненадёжный
-   - `THRESHOLD ≈ 0.5` — типичный эмпирический минимум для анализа
-2. **Гэпы** — если landmark пропал на несколько кадров, интерполируем (если гэп короткий, <5 кадров) либо помечаем фазу как low-confidence
-3. **Отказ от анализа** — если критичные landmarks (wrists, shoulders) ненадёжны на большей части подачи → не анализируем, показываем «не удалось распознать подачу, переснимите»
+1. **Visibility threshold** — if `visibility < THRESHOLD`, flag the landmark as unreliable
+   - `THRESHOLD ≈ 0.5` — a typical empirical minimum for analysis
+2. **Gaps** — if a landmark disappears for a few frames, interpolate (for a short gap, <5 frames) or flag the phase as low-confidence
+3. **Refuse to analyze** — if critical landmarks (wrists, shoulders) are unreliable across most of the serve → do not analyze, show "could not recognize the serve, reshoot"
 
-## Локальные экстремумы (для детекции событий)
+## Local extrema (for event detection)
 
-Детекция trophy/contact основана на **локальных максимумах/минимумах** сглаженных траекторий.
+Trophy/contact detection is based on **local maxima/minima** of smoothed trajectories.
 
 ```typescript
 function localMaxima(values: number[], minProminence = 0): number[] {
   const peaks = [];
   for (let i = 1; i < values.length - 1; i++) {
     if (values[i] > values[i-1] && values[i] >= values[i+1]) {
-      // prominence-фильтр: пик должен выделяться
+      // prominence filter: the peak must stand out
       peaks.push(i);
     }
   }
@@ -133,40 +133,40 @@ function localMaxima(values: number[], minProminence = 0): number[] {
 }
 ```
 
-- `minProminence` отсекает шум (мелкие дрожания не должны считаться пиками)
-- Для **контактного пика** ракеточной руки prominence должен быть существенным (рука поднимается заметно)
+- `minProminence` cuts noise (small jitters must not count as peaks)
+- For the **racket-hand contact peak** the prominence must be substantial (the hand rises noticeably)
 
-## Интеграция MediaPipe в браузере
+## Integrating MediaPipe in the browser
 
-### Рекомендуемый пакет
-- `@mediapipe/tasks-vision` — современный Tasks API (PoseLandmarker)
-- Альтернатива: legacy `@mediapipe/pose`
+### Recommended package
+- `@mediapipe/tasks-vision` — the modern Tasks API (PoseLandmarker)
+- Alternative: the legacy `@mediapipe/pose`
 
-### Поток обработки видео-файла
+### Video-file processing flow
 ```
-1. <video> element загружает файл
-2. Для каждого кадра (через requestVideoFrameCallback или по таймеру):
-   a. Извлекаем ImageBitmap / рисуем на canvas
+1. A <video> element loads the file
+2. For each frame (via requestVideoFrameCallback or a timer):
+   a. Extract an ImageBitmap / draw onto a canvas
    b. poseLandmarker.detectForVideo(bitmap, timestamp)
-   c. Сохраняем landmarks в массив
-3. После прохода всего видео: сглаживание → расчёт метрик → детекция фаз
+   c. Save the landmarks into an array
+3. After the whole video: smoothing → metric computation → phase detection
 ```
 
-### FPS / производительность
-- `detectForVideo` на mid-range устройстве: ~20-30 FPS
-- Для видео-файла это **не real-time** — обрабатываем кадр-за-кадром, показываем progress
-- Не гонимся за 60fps, важно **сэмплировать все кадры** (или ≥30fps) чтобы не пропустить быстрые события (contact)
+### FPS / performance
+- `detectForVideo` on a mid-range device: ~20-30 FPS
+- For a video file this is **not real-time** — we process frame by frame and show progress
+- We don't chase 60fps; what matters is **sampling every frame** (or ≥30fps) so we don't miss fast events (contact)
 
-## Типичные ошибки при работе с pose data
+## Common mistakes when working with pose data
 
-1. **Забыть сглаживать** → детектор фаз находит «пики» от шума
-2. **Считать угол в 2D для движения в глубину** → неверный угол. Проверять visibility и помечать low-confidence
-3. **Игнорировать visibility** → анализ окклюдированных landmarks даёт бред
-4. **Перепутать лево/право** → MediaPipe даёт landmarks относительно **зеркального** отображения (как видит камера). Проверить convention в тестах.
-5. **Магические пороги без источника** → см. `docs/task-rules.md` §6, все пороги в именованные константы
+1. **Forgetting to smooth** → the phase detector finds "peaks" from noise
+2. **Computing a 2D angle for motion in depth** → wrong angle. Check visibility and flag low-confidence
+3. **Ignoring visibility** → analyzing occluded landmarks produces nonsense
+4. **Confusing left/right** → MediaPipe gives landmarks relative to the **mirrored** view (as the camera sees it). Pin the convention in tests.
+5. **Magic thresholds without a source** → see `docs/task-rules.md` §6, all thresholds go into named constants
 
-## Связанные
-- Полный референс биомеханики: `docs/biomechanics/serve-phases.md`
-- Детекция фаз по landmarks: скилл `tennis-serve-phases`
-- Правила ошибок: скилл `serve-error-detection`
-- Источник порогов: эмпирически + Chow et al., MDPI/Frontiers 2024 (см. research/)
+## Related
+- Full biomechanics reference: `docs/biomechanics/serve-phases.md`
+- Detecting phases from landmarks: the `tennis-serve-phases` skill
+- Error rules: the `serve-error-detection` skill
+- Threshold sources: empirically + Chow et al., MDPI/Frontiers 2024 (see research/)

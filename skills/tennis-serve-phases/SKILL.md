@@ -1,20 +1,20 @@
 ---
 name: tennis-serve-phases
-description: Детекция и разбиение подачи в теннисе на фазы. Читай перед работой над детекцией ключевых событий подачи (release, trophy, contact, follow-through) и разбиением на фазы. Использует 8-стадийную модель Chow et al., сгруппированную в 4 практические фазы для прототипа.
+description: Detecting and splitting a tennis serve into phases. Read before working on detecting key serve events (release, trophy, contact, follow-through) and splitting the motion into phases. Uses the 8-stage model by Chow et al., grouped into 4 practical phases for the prototype.
 ---
 
-# Скилл: Детекция фаз подачи в теннисе
+# Skill: Tennis Serve Phase Detection
 
-## Когда использовать
+## When to use
 
-Перед любой задачей, которая:
-- Разбивает подачу на фазы
-- Детектирует ключевые события (release, trophy, contact, follow-through)
-- Работает с таймстампами / границами фаз
+Before any task that:
+- Splits a serve into phases
+- Detects key events (release, trophy, contact, follow-through)
+- Works with timestamps / phase boundaries
 
-## Модель фаз
+## Phase model
 
-Подача разбивается на **4 практические фазы** (упрощение 8-стадийной модели Chow et al.):
+A serve is split into **4 practical phases** (a simplification of the 8-stage Chow et al. model):
 
 ```
 release ──► trophy ──► contact ──► follow-through
@@ -22,57 +22,57 @@ release ──► trophy ──► contact ──► follow-through
    └──prep─────┴──accel────┴──follow──────┘
 ```
 
-| Фаза | От | До | Что характерно |
+| Phase | From | To | What is typical |
 |---|---|---|---|
-| **Preparation** | старт видео | trophy | подброс мяча, сгибание коленей |
-| **Trophy** | trophy event | начало acceleration | ракетка за головой, колени согнуты, тосс-рука вытянута |
-| **Acceleration** | после trophy | contact | разгон, удар |
-| **Follow-through** | contact | конец | завершение, торможение |
+| **Preparation** | video start | trophy | ball toss, knee bend |
+| **Trophy** | trophy event | start of acceleration | racket behind the head, knees bent, toss arm extended |
+| **Acceleration** | after trophy | contact | acceleration, hit |
+| **Follow-through** | contact | end | finish, deceleration |
 
-> ⚠️ Trophy — это **и** стадия (точка во времени), **и** фаза (интервал). В коде разделяй: `detectTrophyEvent()` возвращает timestamp, а фаза — интервал от trophy до начала acceleration.
+> ⚠️ Trophy is **both** a stage (a point in time) **and** a phase (an interval). Keep them separate in code: `detectTrophyEvent()` returns a timestamp, while the phase is the interval from trophy to the start of acceleration.
 
-## Ключевые события и их детекция
+## Key events and how to detect them
 
-События — это **точки во времени**. Фазы строятся из интервалов между ними.
+Events are **points in time**. Phases are built from the intervals between them.
 
-### 1. Release (подброс мяча)
-**Что:** мяч покидает руку игрока.
+### 1. Release (ball toss)
+**What:** the ball leaves the player's hand.
 
-**Как детектить (подход):**
-- Тосс-рука (запястье) поднимается вверх, затем начинается восходящая траектория объекта-мяча
-- На прототипе без трекинга мяча: локальный паттерн — тосс-рука достигает локального максимума высоты и начинает опускаться, при этом движение «раскрытия» кисти
-- **Упрощение для прототипа:** если трекинг мяча недоступен, release ≈ момент, когда тосс-рука перестаёт подниматься
+**How to detect (approach):**
+- The toss arm (wrist) rises, then the ascending trajectory of the ball-object begins
+- On the prototype without ball tracking: a local pattern — the toss arm reaches a local height maximum and starts to descend, with a hand "opening" motion
+- **Simplification for the prototype:** when ball tracking is unavailable, release ≈ the moment the toss arm stops rising
 
-### 2. Trophy position (ключевая фаза)
-**Что:** ракетка за головой (racket drop), тосс-рука вытянута вверх, колени согнуты.
+### 2. Trophy position (key phase)
+**What:** racket behind the head (racket drop), toss arm extended upward, knees bent.
 
-**Как детектить:**
-- **Ракетка над головой** — wrist ракеточной руки выше носа/головы (по y-координате в image space, при вертикальной съёмке)
-- **Колени согнуты** — локальный максимум угла сгиба колена (см. скилл cv-pose-estimation для расчёта)
-- **Тосс-рука вытянута вверх** — wrist тосс-руки близок к верхнему положению
+**How to detect:**
+- **Racket overhead** — the racket-hand wrist is above the nose/head (by the y-coordinate in image space, for a vertical shot)
+- **Knees bent** — a local maximum of the knee flexion angle (see the cv-pose-estimation skill for the calculation)
+- **Toss arm extended upward** — the toss-hand wrist is near its top position
 
-Trophy ≈ момент **максимального сгибания коленей** при условии, что ракетка над головой. Это надёжный маркер.
+Trophy ≈ the moment of **maximum knee flexion** provided the racket is overhead. This is a reliable marker.
 
-### 3. Contact (удар по мячу)
-**Что:** ракетка встречается с мячом в верхней точке.
+### 3. Contact (ball strike)
+**What:** the racket meets the ball at the top.
 
-**Как детектить:**
-- **Максимальное вытяжение вверх** — wrist ракеточной руки в локальном максимуме высоты
-- **Мяч резко меняет траекторию** (если есть трекинг мяча)
-- **Ракеточная рука почти полностью выпрямлена** — угол локтя близок к 180°
-- **Игрок начинает descend** (тело опускается после прыжка/вытяжения)
+**How to detect:**
+- **Maximum upward extension** — the racket-hand wrist is at a local height maximum
+- **The ball sharply changes trajectory** (if ball tracking is available)
+- **The racket arm is almost fully extended** — the elbow angle is close to 180°
+- **The player begins to descend** (the body drops after the jump/extension)
 
-**Упрощение для прототипа:** contact ≈ локальный максимум высоты wrist ракеточной руки, после trophy, при условии что локоть выпрямлен.
+**Simplification for the prototype:** contact ≈ a local maximum of the racket-hand wrist height, after trophy, provided the elbow is extended.
 
 ### 4. Follow-through start
-**Что:** после контакта, ракетка идёт вниз и через туловище.
+**What:** after contact, the racket travels down and across the torso.
 
-**Как детектить:**
-- После contact: wrist ракеточной руки опускается ниже плеча
-- Ракетка пересекает среднюю линию тела (для правшей — уходит влево)
-- Движение замедляется
+**How to detect:**
+- After contact: the racket-hand wrist drops below the shoulder
+- The racket crosses the body's midline (for right-handers — it goes left)
+- The motion slows down
 
-## Алгоритм разбиения (концептуально)
+## The split algorithm (conceptually)
 
 ```
 function splitIntoPhases(poses: Pose[], fps: number): Phases {
@@ -89,41 +89,41 @@ function splitIntoPhases(poses: Pose[], fps: number): Phases {
 }
 ```
 
-## Важные нюансы
+## Important nuances
 
-### Ракеточная vs тоссовая рука
-- Для правшей: **левая рука — тосс**, **правая — ракетка**
-- Для левшей: наоборот
-- На прототипе: **детектируем левшу/правшу** по тому, какая рука поднимает мяч на release, либо спрашиваем пользователя
+### Racket vs toss hand
+- For right-handers: **left hand toss**, **right hand racket**
+- For left-handers: the reverse
+- On the prototype: we **detect left/right** by which hand raises the ball at release, or ask the user
 
-### Съёмка
-- **Стандарт для прототипа:** камера сбоку, на уровне игрока, игрок целиком в кадре
-- Предполагаем **вертикальную ориентацию** (player стоящий) или возможность поворота
-- Pose estimation чувствителен к ракурсу — предупреждаем пользователя если игрок не полностью в кадре
+### Shooting
+- **Standard for the prototype:** camera on the side, at the player's level, player fully in frame
+- We assume a **vertical orientation** (player standing) or the ability to rotate
+- Pose estimation is sensitive to the angle — warn the user if the player is not fully in frame
 
 ### FPS
-- MediaPipe Pose даёт landmarks по кадрам
-- Для детекции фаз важна **временнáя разрешимость**: при 30fps трофей и контакт могут быть в 1–2 кадрах друг от друга (быстрое движение)
-- **Сглаживание** траекторий обязательно (см. скилл cv-pose-estimation), иначе локальные экстремумы шумят
+- MediaPipe Pose gives per-frame landmarks
+- For phase detection **temporal resolution** matters: at 30fps trophy and contact can be 1–2 frames apart (fast motion)
+- **Smoothing** of trajectories is mandatory (see the cv-pose-estimation skill), otherwise local extrema are noisy
 
-### Что может пойти не так
-- **Trophy не выражен** (игрок «плоско» подаёт) → правило trophy может не сработать. Fallback: разбивка по времени (preparation ~60%, acceleration ~20%, follow ~20% от длины клипа) с пометкой «low confidence».
-- **Contact размазан** (медленный замах) → несколько локальных максимумов. Сглаживание + выбор максимума после trophy.
-- **Игрок частично вне кадра** → низкая visibility landmarks. Помечаем фазу как «low confidence» или отказываемся анализировать.
+### What can go wrong
+- **Trophy not expressed** (the player serves "flat") → the trophy rule may not fire. Fallback: a time-based split (preparation ~60%, acceleration ~20%, follow ~20% of the clip length) flagged "low confidence".
+- **Contact smeared** (a slow swing) → several local maxima. Smoothing + picking the maximum after trophy.
+- **Player partly out of frame** → low landmark visibility. Flag the phase as "low confidence" or refuse to analyze.
 
-## Тестирование детекции фаз
+## Testing phase detection
 
-- **Unit-тесты на синтетических данных:** генерируем массив кейпоинтов с известной фазовой структурой, проверяем что детектор возвращает правильные границы
-- **Интеграционно:** на 3–5 реальных коротких видео с ручной разметкой фаз (golden files), допуски ±2 кадра
-- См. `docs/task-rules.md` §3 (TDD)
+- **Unit tests on synthetic data:** generate a keypoint array with a known phase structure, verify the detector returns the correct boundaries
+- **Integration:** on 3–5 real short videos with manual phase labeling (golden files), ±2-frame tolerance
+- See `docs/task-rules.md` §3 (TDD)
 
-## Что НЕ делаем на прототипе
-- Детекцию stance, отдельных стадий knee flexion (4 стадии → 1 trophy)
-- Трекинг мяча как обязательное условие (опционально, если добавим YOLO)
-- Разбиение acceleration на под-стадии (external/internal rotation отдельно)
+## What we do NOT do on the prototype
+- Detection of stance, separate knee-flexion stages (4 stages → 1 trophy)
+- Ball tracking as a hard requirement (optional, if we add YOLO)
+- Splitting acceleration into sub-stages (external/internal rotation separately)
 
-## Связанные
-- Полный референс: `docs/biomechanics/serve-phases.md`
-- Расчёт углов и landmarks: скилл `cv-pose-estimation`
-- Правила ошибок: скилл `serve-error-detection`
+## Related
+- Full reference: `docs/biomechanics/serve-phases.md`
+- Angle and landmark calculation: the `cv-pose-estimation` skill
+- Error rules: the `serve-error-detection` skill
 - ADR-0002 (rule-based): `docs/decisions/0002-rule-based-approach.md`
