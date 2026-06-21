@@ -7,11 +7,16 @@
 export const SMOOTH_WINDOW_FRAMES = 5;
 
 // Racket arm considered "extended" at contact (elbowExtension >= this).
-// Empirical; widened for amateur variability. Calibration on test serves is next-phase.
-export const CONTACT_ELBOW_MIN_DEG = 160;
+// Calibrated down from 160 on the demo clip: at the true contact frame the
+// smoothed shoulder-elbow-wrist angle reads ~147 deg (overhead self-occlusion
+// flattens the estimate), so 160 rejected the real contact. Provisional.
+export const CONTACT_ELBOW_MIN_DEG = 140;
 
 // Minimum normalized height rise for a racket-wrist peak to count (noise filter).
-export const CONTACT_HEIGHT_PROMINENCE = 0.05;
+// Calibrated down from 0.05: after the mandatory trajectory smoothing the real
+// contact peak on the demo clip has a prominence of only ~0.02, so 0.05 rejected
+// it and forced the low-confidence global-max fallback. Provisional.
+export const CONTACT_HEIGHT_PROMINENCE = 0.015;
 
 // visibility below this => landmark unreliable (cv-pose-estimation skill, ~0.5).
 export const VISIBILITY_THRESHOLD = 0.5;
@@ -61,3 +66,9 @@ export const KNEE_JOINT_ANGLE_ERROR_MARGIN_DEG = 10;
 
 // Browser memory guard for a single serve clip (ADR-0001).
 export const MAX_CLIP_SECONDS = 30;
+
+// Below this visibility a knee landmark is occluded/unreliable. kneeJointAngle
+// then trusts the other leg instead. On a side view the far leg is routinely
+// occluded and its angle drifts small — the old min(L,R) preferred exactly that
+// noisy leg. 0.5 matches the research-grade VISIBILITY_THRESHOLD above.
+export const KNEE_MIN_VISIBILITY = 0.5;
