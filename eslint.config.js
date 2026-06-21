@@ -19,4 +19,14 @@ export default defineConfig([
       globals: globals.browser,
     },
   },
+  {
+    // shadcn/ui primitives co-export components and their cva variant helpers
+    // (buttonVariants, badgeVariants). That trips react-refresh/only-export-
+    // components, but these files are libraries, not HMR'd screens — relax the
+    // rule here to match the standard shadcn setup.
+    files: ['src/components/ui/**/*.{ts,tsx}'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+    },
+  },
 ])
