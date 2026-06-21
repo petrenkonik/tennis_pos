@@ -9,6 +9,7 @@ import {
   DEFAULT_UI_MAX_LOW_VIS_FRACTION,
 } from './constants/biomechanics';
 import { DEMO_CLIPS, type DemoClip } from './constants/demoClips';
+import { resolveAsset } from './lib/resolveAsset';
 import {
   PHASE_PLAYBACK_SPEED_MIN,
   PHASE_PLAYBACK_SPEED_MAX,
@@ -194,7 +195,9 @@ export default function App() {
   async function loadDemo(clip: DemoClip) {
     setHandedness(clip.handedness);
     try {
-      const resp = await fetch(clip.path);
+      // Resolve against BASE_URL so the fetch works under a sub-path base
+      // (GitHub Pages serves at /tennis_pos/, not /). clip.path is relative.
+      const resp = await fetch(resolveAsset(clip.path));
       if (!resp.ok) throw new Error(`demo fetch failed: ${resp.status}`);
       const blob = await resp.blob();
       const name = clip.path.split('/').pop() ?? 'demo.mp4';

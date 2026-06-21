@@ -2,7 +2,7 @@
   "$schema": "https://tennis_pos.local/demo-clip.v1.json",
   "id": "serve-right-side",
   "titleKey": "demo.serveRightSide.title",
-  "path": "/demo/clips/serve-right-side.mp4",
+  "path": "demo/clips/serve-right-side.mp4",
   "handedness": "right",
   "description": "Single right-handed serve recorded from the side, the canonical framing for the pipeline (player fully in frame, knees to head visible). Used by the one-click 'Try a demo serve' button in App.",
   "video": {

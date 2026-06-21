@@ -31,9 +31,13 @@ This slice adds **no new logic**. The CV pipeline, phase detection, and error ru
 ```
 public/demo/clips/serve-right-side.mp4   ← static asset served at /demo/clips/…
                  │
-                 │  fetch(path) → Blob → new File([blob], name)
+                 │  fetch(resolveAsset(path)) → Blob → new File([blob], name)
                  ▼
 src/constants/demoClips.ts   ← manifest: [{ id, titleKey, path, handedness }]
+                              path is relative ('demo/clips/…'), no leading slash
+                 │
+                 ▼
+src/lib/resolveAsset.ts      ← path → BASE_URL + path (handles sub-path deploys)
                  │
                  ▼
 src/App.tsx
@@ -61,7 +65,7 @@ import type { Handedness } from '../types';
 export interface DemoClip {
   id: string;          // stable React key
   titleKey: string;    // i18n key, NOT a display string (task-rules §8)
-  path: string;        // root-relative URL, e.g. '/demo/clips/serve-right-side.mp4'
+  path: string;        // relative path (no leading slash), e.g. 'demo/clips/serve-right-side.mp4'
   handedness: Handedness; // applied to the toggle when the clip loads
 }
 
@@ -85,6 +89,6 @@ async function loadDemo(clip: DemoClip): Promise<void>;
 ## Risks / open questions
 
 - **Missing `.mp4` until the user supplies it.** Mitigated: `public/demo/clips/.gitkeep` reserves the directory; the failure path renders a clean error; covered by the 404 test.
-- **`fetch` of a same-origin `public/` asset in dev vs prod.** Vite serves `public/` at `/` in both modes (no `base` set in `vite.config.ts`), so `/demo/clips/foo.mp4` resolves identically.
+- **`fetch` of a same-origin `public/` asset in dev vs prod.** Vite serves `public/` at `/` in dev, but GitHub Pages deploys under a sub-path base (`/tennis_pos/`). Vite rewrites HTML/CSS/JS asset URLs to honor `base`, but **runtime `fetch()` is not rewritten** — so the clip path must be resolved against `import.meta.env.BASE_URL` via `src/lib/resolveAsset.ts`. Holding the path relative (no leading slash) in the manifest makes this concat safe and keeps the catalog deploy-agnostic.
 - **jsdom does not serve `public/`.** Tests stub `globalThis.fetch` explicitly (`vi.stubGlobal`) rather than relying on the dev server.
 - **Demo clip quality.** If the user's `.mp4` is a poor side view, `analyzeServe` may return `serve-not-recognized` — but that is the *correct* pipeline behavior, not a bug in this feature.

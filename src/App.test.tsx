@@ -266,11 +266,42 @@ describe('<App/> demo-button flow', () => {
       await user.click(screen.getByRole('button', { name: /try a demo serve/i }));
     });
 
-    // fetch hit the manifest path, analyzeServe was reached exactly once.
+    // fetch hit the manifest path (dev base '/'), analyzeServe was reached once.
+    // In Vitest import.meta.env.BASE_URL defaults to '/', so resolveAsset()
+    // yields the same '/demo/clips/...' URL as before the fix.
     await waitFor(() => {
       expect(analyzeServe).toHaveBeenCalledTimes(1);
     });
     expect(vi.mocked(fetch)).toHaveBeenCalledWith('/demo/clips/serve-right-side.mp4');
+  });
+
+  it('prefixes the clip path with BASE_URL in production (regression for the 404)', async () => {
+    // On GitHub Pages Vite builds with base='/tennis_pos/', but runtime fetch()
+    // is NOT auto-rewritten — loadDemo must resolve the clip path against
+    // import.meta.env.BASE_URL or the fetch 404s. Stub the env value to the prod
+    // base and assert the URL carries the sub-path.
+    vi.stubEnv('BASE_URL', '/tennis_pos/');
+    vi.mocked(analyzeServe).mockResolvedValue(successResult);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        blob: () => Promise.resolve(new Blob(['dummy'], { type: 'video/mp4' })),
+      }),
+    );
+
+    const user = userEvent.setup();
+    render(<App />);
+
+    await act(async () => {
+      await user.click(screen.getByRole('button', { name: /try a demo serve/i }));
+    });
+
+    await waitFor(() => {
+      expect(vi.mocked(fetch)).toHaveBeenCalledWith(
+        '/tennis_pos/demo/clips/serve-right-side.mp4',
+      );
+    });
   });
 
   it('shows an error when the demo fetch fails (e.g. the .mp4 is absent)', async () => {

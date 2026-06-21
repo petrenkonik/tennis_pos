@@ -10,8 +10,10 @@ export interface DemoClip {
   id: string;
   // i18n key for the clip label (NOT a display string — task-rules §8).
   titleKey: string;
-  // Root-relative URL — Vite serves public/ at '/', so a clip at
-  // public/demo/clips/foo.mp4 is fetched as '/demo/clips/foo.mp4'.
+  // Path relative to the site base (NO leading slash), e.g.
+  // 'demo/clips/foo.mp4' for a file at public/demo/clips/foo.mp4. Resolved
+  // against import.meta.env.BASE_URL at fetch time via resolveAsset(), so it
+  // works both in dev (base '/') and on GitHub Pages (base '/tennis_pos/').
   path: string;
   // Applied to the handedness toggle when the demo is loaded, so the
   // pipeline and UI agree on which arm is the racket arm.
@@ -25,7 +27,7 @@ export const DEMO_CLIPS: readonly DemoClip[] = [
   {
     id: 'serve-right-side',
     titleKey: 'demo.serveRightSide.title',
-    path: '/demo/clips/serve-right-side.mp4',
+    path: 'demo/clips/serve-right-side.mp4',
     handedness: 'right',
   },
 ];
