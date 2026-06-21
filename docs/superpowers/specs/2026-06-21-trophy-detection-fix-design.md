@@ -1,8 +1,15 @@
 # Trophy Detection Fix — anchor on contact, robust knee, toss-arm gate
 
 **Date:** 2026-06-21
-**Status:** Under review
+**Status:** Implemented (2026-06-22)
 **Analysis layers:** Layer 1 (phase split) primarily. Layer 2 benefits indirectly — every angle/height metric is measured relative to a phase boundary, so a misplaced trophy corrupts Layer 2 too. No Layer 3 change.
+
+> **Implementation note — calibration round (2026-06-22).** The design below describes the original approach (A contact-first, B toss-arm *band* gate, C robust knee). A/C shipped as designed. After implementing them, a demo-clip check (heavy model, 30 fps — the browser's real path) showed the success metric was not yet met: the trophy still landed on the racket-drop (deepest knee, ~frame 25) rather than the trophy pose, and the real contact peak was rejected by two too-strict gates. The fix, agreed with the user, refined the mechanism:
+> - **Trophy anchor changed from the toss-arm *band* gate to the toss-arm *peak*:** trophy = the overhead frame nearest the toss-arm vertical peak in `[0, contact)`, with knee depth only as a tie-break. The toss peak coincides with the trophy pose; the deepest knee comes a few frames later during the racket drop. `TOSS_ARM_PEAK_BAND` was removed.
+> - **Contact gates relaxed for smoothed amateur footage:** `CONTACT_HEIGHT_PROMINENCE` 0.05 → 0.015, `CONTACT_ELBOW_MIN_DEG` 160 → 140 (the real smoothed contact peak has prominence ~0.02 and elbow ~147°).
+> - **C3 knee metric windowed:** `buildPhaseContext` now reports the deepest robust knee flexion over `[trophy, contact)`, not the instantaneous trophy-frame angle, so the pose-anchored trophy does not under-report leg load.
+>
+> Demo result after calibration: **trophy = frame 17, contact = frame 36 (confident), C3 knee = 147°** (within the normal [140,160] range) — success metric met. See `docs/superpowers/plans/2026-06-21-trophy-detection-fix.md` Task 6.
 
 ## Context
 

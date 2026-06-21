@@ -596,3 +596,266 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 **Placeholder scan:** No TBD / "handle edge cases" / "similar to" / bodiless code steps — every code step shows full content.
 
 **Type consistency:** `kneeJointAngle(f: PoseFrame): number` (Task 1) is consumed with that exact signature in Task 3 and Task 4. `tossWristHeight(f, h)` (Task 1) consumed in Task 3. `detectContact`/`detectTrophy` return `{ frame: number; confident: boolean }` and are consumed as `.frame` / `.confident` in `detectPhases`. The metric field stays `kneeFlexionAtTrophyDeg` everywhere (types.ts, buildPhaseContext, ruleC3 — ruleC3 untouched).
+
+
+---
+
+# Task 6: Calibration — anchor trophy on toss-arm peak, relax contact gates, window the C3 knee
+
+**Why:** Tasks 1–5 fixed the gross bug, but a demo-clip check (heavy model, 30 fps — the browser's real path) showed the success metric was not yet met: trophy landed on frame 25 (the racket-drop) instead of [16,22], and contact, though on the right frame (36), was flagged low-confidence. Evidence from a per-frame dump:
+- The visible (right) knee genuinely keeps flexing from the trophy pose (~f17) through the racket drop to peak load (~f28). So "deepest knee among overhead frames" anchors trophy on the racket-drop, not the pose. The **toss-arm vertical peak (f17)** coincides with the trophy pose and is the better anchor.
+- The real contact peak has height-prominence ~0.020 (< the 0.05 threshold) and an elbow angle of ~147° (< the 160° threshold), so both contact gates were too strict for smoothed amateur footage.
+- Because trophy moves to the pose (where the knee is only ~168°), the C3 "knee bend" metric must measure the **deepest** knee flexion over the trophy→contact window, not the instantaneous trophy-frame angle, or it would falsely report "barely bent".
+
+Decision (made with the user): anchor trophy on the toss-arm peak; relax the two contact thresholds; window the C3 knee. Confirmed on the demo via the offline harness: **trophy=17, contact=36 (confident), C3 knee=147°** (within the normal [140,160] range = "ok").
+
+**Files:**
+- Modify: `src/constants/biomechanics.ts`
+- Modify: `src/pipeline/detectPhases.ts`
+- Modify: `src/__tests__/fixtures/poses.ts`
+- Modify: `src/pipeline/detectPhases.test.ts`
+- Modify: `src/pipeline/buildPhaseContext.ts`
+- Modify: `src/pipeline/buildPhaseContext.test.ts`
+- Modify: `src/rules/ruleC3.ts` (comment only)
+
+**Interfaces:**
+- Consumes: `kneeJointAngle`, `tossWristHeight`, `racketWristHeight`, `elbowExtension` (`src/pose/metrics.ts`); `racketWrist` (`src/pose/landmarks.ts`); `localMaxima` (`src/pose/geometry.ts`).
+- Produces: `detectTrophy` now anchors on the toss-arm peak; `buildPhaseContext` sources `kneeFlexionAtTrophyDeg` as the min knee joint angle over `[trophyFrame, contactFrame)`. Public signatures unchanged. The constant `TOSS_ARM_PEAK_BAND` is **removed** (no longer used).
+
+---
+
+- [ ] **Step 1: Relax the contact thresholds; remove the unused toss band**
+
+In `src/constants/biomechanics.ts`:
+
+Change `CONTACT_ELBOW_MIN_DEG` (currently `160`) to:
+
+```typescript
+// Racket arm considered "extended" at contact (elbowExtension >= this).
+// Calibrated down from 160 on the demo clip: at the true contact frame the
+// smoothed shoulder-elbow-wrist angle reads ~147 deg (overhead self-occlusion
+// flattens the estimate), so 160 rejected the real contact. Provisional.
+export const CONTACT_ELBOW_MIN_DEG = 140;
+```
+
+Change `CONTACT_HEIGHT_PROMINENCE` (currently `0.05`) to:
+
+```typescript
+// Minimum normalized height rise for a racket-wrist peak to count (noise filter).
+// Calibrated down from 0.05: after the mandatory trajectory smoothing the real
+// contact peak on the demo clip has a prominence of only ~0.02, so 0.05 rejected
+// it and forced the low-confidence global-max fallback. Provisional.
+export const CONTACT_HEIGHT_PROMINENCE = 0.015;
+```
+
+Delete the `TOSS_ARM_PEAK_BAND` constant block entirely (the trophy detector no longer uses a band — it anchors on the toss peak directly).
+
+- [ ] **Step 2: Add the toss-anchor fixture**
+
+In `src/__tests__/fixtures/poses.ts`, after `buildTossGateServe`, add:
+
+```typescript
+// Right-handed serve where the toss-arm peak (f2) is the trophy pose, but a LATER
+// overhead frame (f4) has a deeper knee bend (the racket-drop load). The toss-peak
+// anchor must pick f2; the old "deepest knee in window" rule would have picked f4.
+// Also exercises the C3 trophy->contact knee window (deepest in [2,5) is f4).
+// trophy=2, contact=5, followStart=6.
+export function buildKneeAfterTrophyServe(): PoseFrame[] {
+  const specs: Array<['straight'|'bent'|'deep', number, number, number]> = [
+    ['straight', 0.70, 0.62, 0.70], // f0 prep
+    ['bent',     0.55, 0.50, 0.45], // f1 rising (not overhead), toss rising
+    ['bent',     0.45, 0.42, 0.10], // f2 TROPHY: overhead, toss arm PEAK (highest)
+    ['bent',     0.42, 0.40, 0.40], // f3 overhead, toss dropping, knee a bit deeper
+    ['deep',     0.40, 0.38, 0.55], // f4 overhead, DEEPEST knee (racket-drop load)
+    ['straight', 0.12, 0.32, 0.55], // f5 CONTACT: highest + straight elbow
+    ['straight', 0.62, 0.58, 0.60], // f6 follow start: wrist below shoulder
+  ];
+  return specs.map(([bend, wY, eY, tY], i) =>
+    makeFrame(i, makeLandmarks({ ...nose, ...knee(bend), ...arm(wY, eY), ...toss(tY) })));
+}
+```
+
+- [ ] **Step 3: Write the failing trophy-anchor test**
+
+Add to `src/pipeline/detectPhases.test.ts` (extend the line-3 fixtures import with `buildKneeAfterTrophyServe`), inside the `describe('detectPhases', ...)` block:
+
+```typescript
+  it('anchors trophy on the toss-arm peak, not the deepest knee in the window', () => {
+    // f2 is the toss-arm peak (trophy pose); f4 is overhead with a deeper knee
+    // (racket-drop load). Trophy must be f2, proving the anchor is the toss peak.
+    const r = detectPhases(buildKneeAfterTrophyServe(), 'right');
+    expect(r.events.trophyFrame).toBe(2);
+    expect(r.events.contactFrame).toBe(5);
+    expect(r.confidence).toBe('high');
+  });
+```
+
+- [ ] **Step 4: Run the new test to verify it fails**
+
+Run: `npx vitest run src/pipeline/detectPhases.test.ts`
+Expected: FAIL — the current (band + deepest-knee) `detectTrophy` picks `trophyFrame === 4` (the deeper knee), not 2. The 11 existing tests still pass.
+
+- [ ] **Step 5: Replace `detectTrophy` with the toss-peak anchor**
+
+In `src/pipeline/detectPhases.ts`, remove `TOSS_ARM_PEAK_BAND` from the import block (the `constants/biomechanics` import line), and replace the entire `detectTrophy` function (the block from its leading comment through its closing brace) with:
+
+```typescript
+// Trophy = the overhead frame nearest the toss-arm's vertical peak within
+// [0, searchEnd). The toss arm reaches full extension at the trophy POSE (racket
+// behind the head); the deepest knee bend comes a few frames LATER, during the
+// racket drop / leg load, so anchoring on the toss peak (not the knee minimum)
+// keeps trophy on the pose itself. Knee depth is only a tie-break between frames
+// equidistant from the peak. Returns frame -1 when no frame is overhead (trophy
+// "not expressed") so the caller can use the time-based fallback.
+function detectTrophy(
+  poses: PoseFrame[], h: Handedness, searchEnd: number,
+): { frame: number; confident: boolean } {
+  const end = Math.min(searchEnd, poses.length);
+  if (end <= 0) return { frame: -1, confident: false };
+
+  let tossPeakFrame = 0, tossPeakH = -Infinity;
+  for (let i = 0; i < end; i++) {
+    const th = tossWristHeight(poses[i], h);
+    if (th > tossPeakH) { tossPeakH = th; tossPeakFrame = i; }
+  }
+
+  let frame = -1, bestDist = Infinity, bestKnee = Infinity;
+  for (let i = 0; i < end; i++) {
+    const overhead = racketWrist(poses[i], h).y < poses[i].landmarks[TROPHY_OVERHEAD_REF_LM].y;
+    if (!overhead) continue;
+    const dist = Math.abs(i - tossPeakFrame);
+    const knee = kneeJointAngle(poses[i]);
+    const kneeVal = Number.isNaN(knee) ? Infinity : knee;
+    if (dist < bestDist || (dist === bestDist && kneeVal < bestKnee)) {
+      bestDist = dist; bestKnee = kneeVal; frame = i;
+    }
+  }
+  return frame >= 0 ? { frame, confident: true } : { frame: -1, confident: false };
+}
+```
+
+Note: `tossWristHeight` and `kneeJointAngle` are already imported in this file (do not re-import). After removing `TOSS_ARM_PEAK_BAND`, make sure no other reference to it remains in the file.
+
+- [ ] **Step 6: Run the detection suite to verify it passes**
+
+Run: `npx vitest run src/pipeline/detectPhases.test.ts`
+Expected: PASS — all 12 tests (11 prior + the new anchor test). The happy-serve, landing-crouch, and toss-gate fixtures still resolve to `trophyFrame === 2` (each one's toss peak is nearest frame 2), so the earlier assertions hold.
+
+- [ ] **Step 7: Write the failing C3-window test**
+
+Replace `src/pipeline/buildPhaseContext.test.ts` with:
+
+```typescript
+import { describe, it, expect } from 'vitest';
+import { buildPhaseContext } from './buildPhaseContext';
+import { detectPhases } from './detectPhases';
+import { buildHappyServe, buildKneeAfterTrophyServe } from '../__tests__/fixtures/poses';
+import { kneeJointAngle } from '../pose/metrics';
+
+describe('buildPhaseContext', () => {
+  it('exposes the deepest robust knee flexion over the trophy->contact window', () => {
+    // buildKneeAfterTrophyServe: trophy=2, contact=5; the deepest knee in [2,5)
+    // is f4 (the racket-drop load), not the trophy frame f2. The metric must be
+    // f4's angle, proving it windows rather than reading a single frame.
+    const poses = buildKneeAfterTrophyServe();
+    const phases = detectPhases(poses, 'right');
+    expect(phases.events.trophyFrame).toBe(2);
+    expect(phases.events.contactFrame).toBe(5);
+    const ctx = buildPhaseContext(poses, 30, phases);
+    expect(ctx.metrics.kneeFlexionAtTrophyDeg).toBeCloseTo(kneeJointAngle(poses[4]), 5);
+    expect(ctx.metrics.kneeFlexionAtTrophyDeg).toBeLessThan(kneeJointAngle(poses[2]));
+  });
+
+  it('passes through fps and the phases object', () => {
+    const poses = buildHappyServe();
+    const phases = detectPhases(poses, 'right');
+    const ctx = buildPhaseContext(poses, 30, phases);
+    expect(ctx.fps).toBe(30);
+    expect(ctx.phases).toBe(phases);
+  });
+});
+```
+
+- [ ] **Step 8: Run the test to verify it fails**
+
+Run: `npx vitest run src/pipeline/buildPhaseContext.test.ts`
+Expected: FAIL — current `buildPhaseContext` reads only the trophy frame (f2), so `kneeFlexionAtTrophyDeg` equals f2's angle, not f4's.
+
+- [ ] **Step 9: Window the C3 knee in buildPhaseContext**
+
+Replace `src/pipeline/buildPhaseContext.ts` with:
+
+```typescript
+import type { PoseFrame, Phases, PhaseContext } from '../types';
+import { kneeJointAngle } from '../pose/metrics';
+
+// Computes the metrics rules read. C3 measures knee bend as the DEEPEST robust
+// knee flexion over the trophy->contact window (not a single frame): the trophy
+// event sits on the trophy POSE, while peak leg load comes a few frames later
+// during the racket drop. Reading only the trophy frame would under-report the
+// bend. Falls back to the trophy frame if the window is empty; NaN when no frame
+// has a readable knee (ruleC3 renders NaN as "unknown").
+export function buildPhaseContext(poses: PoseFrame[], fps: number, phases: Phases): PhaseContext {
+  const { trophyFrame, contactFrame } = phases.events;
+  const lo = Math.max(0, trophyFrame);
+  const hi = Math.min(contactFrame, poses.length);
+  let minAngle = Infinity;
+  for (let i = lo; i < hi; i++) {
+    const a = kneeJointAngle(poses[i]);
+    if (!Number.isNaN(a) && a < minAngle) minAngle = a;
+  }
+  let kneeFlexionAtTrophyDeg = Number.isFinite(minAngle) ? minAngle : NaN;
+  if (Number.isNaN(kneeFlexionAtTrophyDeg) && trophyFrame >= 0 && trophyFrame < poses.length) {
+    kneeFlexionAtTrophyDeg = kneeJointAngle(poses[trophyFrame]);
+  }
+  return { poses, fps, phases, metrics: { kneeFlexionAtTrophyDeg } };
+}
+```
+
+- [ ] **Step 10: Run the test to verify it passes**
+
+Run: `npx vitest run src/pipeline/buildPhaseContext.test.ts`
+Expected: PASS (2 tests).
+
+- [ ] **Step 11: Fix the stale ruleC3 comment**
+
+In `src/rules/ruleC3.ts`, the comment near the `landmarks` array still describes the old `kneeFlexion()` / `Math.min` behavior. Replace the two-line comment:
+
+```typescript
+    // kneeFlexion() takes Math.min over both legs, so highlight both — the
+    // skeleton overlay paints these landmarks by the rule's status.
+```
+
+with:
+
+```typescript
+    // The knee metric is the deepest robust (more-visible-leg) flexion over the
+    // trophy->contact window; highlight both legs anyway — the skeleton overlay
+    // paints these landmarks by the rule's status.
+```
+
+Do not change any logic in `ruleC3.ts`. (If the exact comment text differs slightly, match it on the `kneeFlexion()` / `Math.min` wording.)
+
+- [ ] **Step 12: Run the full suite and build**
+
+Run: `npx vitest run`
+Expected: PASS — every suite green.
+
+Run: `npm run build`
+Expected: PASS — `tsc -b && vite build` succeed, no unused-symbol error for the removed `TOSS_ARM_PEAK_BAND`.
+
+- [ ] **Step 13: Commit**
+
+```bash
+git add src/constants/biomechanics.ts src/pipeline/detectPhases.ts src/pipeline/detectPhases.test.ts src/__tests__/fixtures/poses.ts src/pipeline/buildPhaseContext.ts src/pipeline/buildPhaseContext.test.ts src/rules/ruleC3.ts
+git commit -m "fix(phases): anchor trophy on toss-arm peak, relax contact gates, window C3 knee
+
+Calibration after demo-clip verification: trophy was landing on the racket-drop
+(deepest knee) instead of the trophy pose. Anchor trophy on the toss-arm vertical
+peak; relax CONTACT_HEIGHT_PROMINENCE (0.05->0.015) and CONTACT_ELBOW_MIN_DEG
+(160->140) which rejected the real smoothed contact peak; measure C3 knee bend as
+the deepest flexion over [trophy, contact) so the pose-anchored trophy does not
+under-report leg load. Demo now: trophy=17, contact=36 (confident).
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
+```
