@@ -1,4 +1,4 @@
-import { useRef, useState, type ChangeEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import i18n, { SUPPORTED_LANGS, type SupportedLang } from './i18n';
 import type { Handedness } from './types';
@@ -9,6 +9,13 @@ import {
   DEFAULT_UI_MAX_LOW_VIS_FRACTION,
 } from './constants/biomechanics';
 import { DEMO_CLIPS, type DemoClip } from './constants/demoClips';
+import {
+  PHASE_PLAYBACK_SPEED_MIN,
+  PHASE_PLAYBACK_SPEED_MAX,
+  PHASE_PLAYBACK_SPEED_STEP,
+  DEFAULT_PHASE_PLAYBACK_SPEED,
+} from './constants/playback';
+import { frameToMs, type PhaseKey } from './lib/phaseTime';
 import { PhaseBar } from './ui/PhaseBar';
 import { AdviceList } from './ui/AdviceList';
 import { RulesReport } from './ui/RulesReport';
@@ -52,6 +59,13 @@ export default function App() {
   const [visTh, setVisTh] = useState(DEFAULT_UI_VISIBILITY_THRESHOLD);
   const [maxLowVis, setMaxLowVis] = useState(DEFAULT_UI_MAX_LOW_VIS_FRACTION);
 
+  // Phase review: clicking a phase block seeks the video to its start and plays
+  // it slowly to the phase end, then pauses. `selectedPhase` is the highlighted
+  // block; `phasePlayback` is the active bounded playback (cleared on pause).
+  const [selectedPhase, setSelectedPhase] = useState<PhaseKey | null>(null);
+  const [phaseSpeed, setPhaseSpeed] = useState(DEFAULT_PHASE_PLAYBACK_SPEED);
+  const [phasePlayback, setPhasePlayback] = useState<{ endMs: number } | null>(null);
+
   // Seek the video to a rule's measurement moment; the skeleton overlay
   // (rAF loop) redraws at that frame automatically.
   function seekTo(timestampMs: number) {
@@ -61,10 +75,66 @@ export default function App() {
     video.currentTime = timestampMs / 1000;
   }
 
+  // Reset playback-rate + selection state to "whole video at 1×". Called on
+  // toggle-off, double-click, and re-upload.
+  function clearPhaseSelection(video?: HTMLVideoElement) {
+    setSelectedPhase(null);
+    setPhasePlayback(null);
+    const v = video ?? videoRef.current;
+    if (v) v.playbackRate = 1;
+  }
+
+  // Clicking a phase block: seek to its start, play slowly to its end, pause.
+  // Clicking the already-selected block (key === null) clears the selection.
+  function handlePhaseSelect(key: PhaseKey | null) {
+    const video = videoRef.current;
+    if (key === null || !video || !result?.ok) {
+      clearPhaseSelection(video ?? undefined);
+      return;
+    }
+    const [startFrame, endFrame] = result.phases.phases[key];
+    const startMs = frameToMs(startFrame, result.poses);
+    const endMs = frameToMs(endFrame, result.poses);
+    setSelectedPhase(key);
+    video.playbackRate = phaseSpeed;
+    video.currentTime = startMs / 1000;
+    void video.play();
+    setPhasePlayback({ endMs });
+  }
+
+  // Native timeupdate: when bounded phase playback reaches the phase end, stop.
+  function onTimeUpdate() {
+    const video = videoRef.current;
+    if (!video || !phasePlayback) return;
+    if (video.currentTime * 1000 >= phasePlayback.endMs) {
+      video.pause();
+      setPhasePlayback(null);
+    }
+  }
+
+  // Double-click the video: drop any phase selection, rewind and play whole.
+  function selectAllVideo() {
+    const video = videoRef.current;
+    if (!video) return;
+    clearPhaseSelection(video);
+    video.currentTime = 0;
+    void video.play();
+  }
+
+  // Keep the video's playbackRate in sync with the slider while a phase is
+  // selected; restore 1× when nothing is selected.
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.playbackRate = selectedPhase ? phaseSpeed : 1;
+  }, [selectedPhase, phaseSpeed]);
+
   // Core load+analyze routine, shared by the file input and the demo button.
   // Accepts a Blob (File extends Blob) and the handedness to analyze with —
   // passed explicitly so loadDemo can apply the clip's handedness without
-  // waiting for a React state flush (which would race the closure).
+  // waiting for a React state flush (which would race the closure). Clears any
+  // active phase-playback selection so playbackRate/selection state from a
+  // previous clip doesn't leak into the new one.
   async function loadVideoFile(file: Blob, hand: Handedness) {
     const video = videoRef.current;
     if (!video) return;
@@ -72,6 +142,7 @@ export default function App() {
     setResult(null);
     setStatus('processing');
     setProgress(0);
+    clearPhaseSelection(video);
     if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
     const url = URL.createObjectURL(file);
     objectUrlRef.current = url;
@@ -290,6 +361,30 @@ export default function App() {
               </div>
             )}
 
+            {/* Collapsible playback settings — slow-motion rate for phase review. */}
+            {showSettings && (
+              <div className="grid gap-4 rounded-lg border bg-muted/30 p-4">
+                <label className="flex flex-col gap-1.5 text-sm">
+                  <span className="font-medium">
+                    {t('controls.phaseSpeed', { n: phaseSpeed.toFixed(2) })}
+                  </span>
+                  <input
+                    type="range"
+                    min={PHASE_PLAYBACK_SPEED_MIN}
+                    max={PHASE_PLAYBACK_SPEED_MAX}
+                    step={PHASE_PLAYBACK_SPEED_STEP}
+                    value={phaseSpeed}
+                    onChange={(e) => setPhaseSpeed(Number(e.target.value))}
+                    disabled={isBusy}
+                    className="accent-primary"
+                  />
+                  <small className="text-xs text-muted-foreground">
+                    {t('controls.phaseSpeedHelp')}
+                  </small>
+                </label>
+              </div>
+            )}
+
             {/* Processing progress bar. */}
             {isBusy && (
               <div className="space-y-1.5">
@@ -318,10 +413,12 @@ export default function App() {
             'relative mb-4 aspect-video w-full overflow-hidden rounded-xl border bg-black shadow-sm',
             status === 'idle' && 'hidden',
           )}
+          onDoubleClick={selectAllVideo}
         >
           <video
             ref={videoRef}
             controls
+            onTimeUpdate={onTimeUpdate}
             className="absolute inset-0 h-full w-full"
           />
           {(status === 'done' || status === 'error') && result && result.poses.length > 0 && (
@@ -359,7 +456,12 @@ export default function App() {
           <div className="space-y-6">
             <section className="space-y-2">
               <SectionLabel>{t('report.colPhase')}</SectionLabel>
-              <PhaseBar phases={result.phases} />
+              <PhaseBar
+                phases={result.phases}
+                selected={selectedPhase}
+                onSelect={handlePhaseSelect}
+              />
+              <p className="text-xs text-muted-foreground">{t('controls.phaseHint')}</p>
             </section>
 
             <section className="space-y-3">

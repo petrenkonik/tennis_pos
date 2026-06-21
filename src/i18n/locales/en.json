@@ -19,7 +19,10 @@
     "visThresholdHelp": "Lower — more tolerant of \"uncertain\" joints.",
     "maxLowVis": "Share of \"bad\" frames for rejection: {{n}}",
     "maxLowVisHelp": "Higher — try to analyze even noisy clips.",
-    "tryDemo": "Try a demo serve"
+    "tryDemo": "Try a demo serve",
+    "phaseSpeed": "Phase playback speed: {{n}}×",
+    "phaseSpeedHelp": "Applied when a phase block is selected — click a block to replay it slowly.",
+    "phaseHint": "Click a phase to replay it slowly. Double-click the video to clear."
   },
   "demo": {
     "serveRightSide": {
