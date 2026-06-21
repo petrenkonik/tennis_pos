@@ -89,17 +89,21 @@ export function buildTossGateServe(): PoseFrame[] {
 }
 
 // Right-handed serve where the toss-arm peak (f2) is the trophy pose, but a LATER
-// overhead frame (f4) has a deeper knee bend (the racket-drop load). The toss-peak
-// anchor must pick f2; the old "deepest knee in window" rule would have picked f4.
+// overhead frame (f4) has a deeper knee bend (the racket-drop load). f3 and f4 are
+// both within the OLD algorithm's 0.10 toss-band (floor = peak tossH 0.90 - 0.10 =
+// 0.80), so the old "deepest knee within the toss band" rule admits f3 (tossH 0.87)
+// and f4 (tossH 0.85) and picks f4 for its deeper knee. The NEW toss-peak anchor
+// instead picks f2 (nearest the toss-arm peak, tie-break never reached) - this is
+// what makes the test discriminate the two algorithms.
 // Also exercises the C3 trophy->contact knee window (deepest in [2,5) is f4).
 // trophy=2, contact=5, followStart=6.
 export function buildKneeAfterTrophyServe(): PoseFrame[] {
   const specs: Array<['straight'|'bent'|'deep', number, number, number]> = [
     ['straight', 0.70, 0.62, 0.70], // f0 prep
     ['bent',     0.55, 0.50, 0.45], // f1 rising (not overhead), toss rising
-    ['bent',     0.45, 0.42, 0.10], // f2 TROPHY: overhead, toss arm PEAK (highest)
-    ['bent',     0.42, 0.40, 0.40], // f3 overhead, toss dropping, knee a bit deeper
-    ['deep',     0.40, 0.38, 0.55], // f4 overhead, DEEPEST knee (racket-drop load)
+    ['bent',     0.45, 0.42, 0.10], // f2 TROPHY: overhead, toss arm PEAK (tossH 0.90)
+    ['bent',     0.42, 0.40, 0.13], // f3 overhead, toss still within old 0.10 band (tossH 0.87)
+    ['deep',     0.40, 0.38, 0.15], // f4 overhead, within old band + DEEPEST knee (tossH 0.85)
     ['straight', 0.12, 0.32, 0.55], // f5 CONTACT: highest + straight elbow
     ['straight', 0.62, 0.58, 0.60], // f6 follow start: wrist below shoulder
   ];
