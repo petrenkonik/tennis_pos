@@ -33,6 +33,11 @@ function arm(wristY: number, elbowY: number) {
 }
 const nose = { [LM.NOSE]: { x: 0.5, y: 0.5 } };
 
+// Toss arm (left wrist for a righty) at a given height-y. Lower y = raised higher.
+function toss(wristY: number) {
+  return { [LM.L_WRIST]: { x: 0.5, y: wristY } };
+}
+
 // Deterministic right-handed serve: trophy=2, contact=4, followStart=6.
 export function buildHappyServe(): PoseFrame[] {
   const specs: Array<[ 'straight'|'bent'|'deep', number, number ]> = [
@@ -46,4 +51,39 @@ export function buildHappyServe(): PoseFrame[] {
   ];
   return specs.map(([bend, wY, eY], i) =>
     makeFrame(i, makeLandmarks({ ...nose, ...knee(bend), ...arm(wY, eY) })));
+}
+
+// Right-handed serve where the DEEPEST knee bend lands AFTER contact (the landing
+// crouch at f5-f6) while the racket wrist is still above the nose. The old
+// "deepest knee among overhead frames" rule picked f5; the contact-bounded rule
+// must pick the real trophy at f2. trophy=2, contact=4, followStart=6.
+export function buildLandingCrouchServe(): PoseFrame[] {
+  // [knee bend, racket wristY, racket elbowY, toss wristY]
+  const specs: Array<['straight'|'bent'|'deep', number, number, number]> = [
+    ['straight', 0.70, 0.62, 0.70], // f0 prep, racket low, toss low
+    ['bent',     0.55, 0.50, 0.45], // f1 rising (not overhead), toss rising
+    ['bent',     0.45, 0.42, 0.15], // f2 TROPHY: overhead, toss UP, knee bent
+    ['bent',     0.30, 0.28, 0.30], // f3 overhead, rising, toss dropping
+    ['straight', 0.12, 0.32, 0.55], // f4 CONTACT: highest + straight elbow
+    ['deep',     0.40, 0.45, 0.70], // f5 post-contact: overhead, DEEPEST knee (landing load)
+    ['deep',     0.62, 0.58, 0.75], // f6 follow start: wrist below shoulder, knee deep
+  ];
+  return specs.map(([bend, wY, eY, tY], i) =>
+    makeFrame(i, makeLandmarks({ ...nose, ...knee(bend), ...arm(wY, eY), ...toss(tY) })));
+}
+
+// Right-handed serve isolating the toss-arm gate: f1 is overhead with the deepest
+// knee but the toss arm is DOWN (decoy); f2 is the real trophy (toss arm UP, knee
+// less bent). The gate must reject f1 and pick f2. trophy=2, contact=4, followStart=5.
+export function buildTossGateServe(): PoseFrame[] {
+  const specs: Array<['straight'|'bent'|'deep', number, number, number]> = [
+    ['straight', 0.70, 0.62, 0.70], // f0 prep
+    ['deep',     0.45, 0.42, 0.70], // f1 overhead, DEEP knee, toss DOWN (decoy)
+    ['bent',     0.44, 0.41, 0.15], // f2 TROPHY: overhead, BENT knee, toss UP
+    ['bent',     0.30, 0.28, 0.30], // f3 overhead, rising
+    ['straight', 0.12, 0.32, 0.55], // f4 CONTACT: highest + straight elbow
+    ['straight', 0.62, 0.58, 0.60], // f5 follow start: wrist below shoulder
+  ];
+  return specs.map(([bend, wY, eY, tY], i) =>
+    makeFrame(i, makeLandmarks({ ...nose, ...knee(bend), ...arm(wY, eY), ...toss(tY) })));
 }
