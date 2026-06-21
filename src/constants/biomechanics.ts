@@ -61,3 +61,15 @@ export const KNEE_JOINT_ANGLE_ERROR_MARGIN_DEG = 10;
 
 // Browser memory guard for a single serve clip (ADR-0001).
 export const MAX_CLIP_SECONDS = 30;
+
+// Below this visibility a knee landmark is occluded/unreliable. kneeJointAngle
+// then trusts the other leg instead. On a side view the far leg is routinely
+// occluded and its angle drifts small — the old min(L,R) preferred exactly that
+// noisy leg. 0.5 matches the research-grade VISIBILITY_THRESHOLD above.
+export const KNEE_MIN_VISIBILITY = 0.5;
+
+// At trophy the toss arm is near its vertical peak. A frame counts as
+// "toss arm extended up" when its toss-wrist height is within this band of the
+// peak toss height observed before contact. Empirical; loosened for amateur
+// tosses that never reach full extension. Provisional pending calibration.
+export const TOSS_ARM_PEAK_BAND = 0.10;
