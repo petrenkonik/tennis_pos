@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import i18n from '../i18n';
 import { ruleC3 } from './ruleC3';
+import { LM } from '../pose/landmarks';
 import type { PhaseContext, Confidence } from '../types';
 
 function makeCtx(kneeFlexionAtTrophyDeg: number, confidence: Confidence = 'high'): PhaseContext {
@@ -72,6 +73,13 @@ describe('ruleC3 (insufficient knee bend)', () => {
       const r = ruleC3.evaluate!(ctx);
       expect(r.atFrame).toBe(1);
       expect(r.atTimestampMs).toBe(2400);
+    });
+    it('declares the landmarks it inspects (both legs) for highlighting', () => {
+      const r = ruleC3.evaluate!(makeCtx(150));
+      // Knees and ankles of both legs — what the rule is about. Hips are
+      // intentionally excluded so the torso isn't highlighted (a listed hip
+      // would also light the shoulder-hip / hip-hip connections).
+      expect(r.landmarks).toEqual([LM.L_KNEE, LM.R_KNEE, LM.L_ANKLE, LM.R_ANKLE]);
     });
   });
 });

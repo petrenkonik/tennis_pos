@@ -216,4 +216,16 @@
       transition-duration: 0.01ms !important;
     }
   }
+
+  /* Pose skeleton overlay: sit on top of the <video> inside the relative
+     video stage. The canvas's internal width/height are set from JS each
+     frame (video.clientWidth/Height); CSS only pins it to the stage and
+     keeps it from intercepting the video's native controls. */
+  .skeleton-overlay {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
 }

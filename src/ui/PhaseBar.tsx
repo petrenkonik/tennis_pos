@@ -24,10 +24,18 @@ export function PhaseBar({
   phases,
   selected,
   onSelect,
+  hovered,
+  onHover,
 }: {
   phases: Phases;
   selected?: PhaseKey | null;
   onSelect?: (key: PhaseKey | null) => void;
+  // Hovered phase drives a temporary skeleton highlight without seeking;
+  // hover wins over selection (mirrors the rule-card pattern), so sweeping
+  // the cursor across blocks previews each one, then snaps back to the
+  // selected phase when the cursor leaves the bar.
+  hovered?: PhaseKey | null;
+  onHover?: (key: PhaseKey | null) => void;
 }) {
   const { t } = useTranslation();
   const interactive = !!onSelect;
@@ -40,21 +48,32 @@ export function PhaseBar({
       )}
       role="group"
       aria-label={t('report.colPhase')}
+      // Leaving the bar clears the hover highlight so it falls back to the
+      // selected phase (or none). Drag-out through the border still fires.
+      onMouseLeave={onHover ? () => onHover(null) : undefined}
     >
       {PHASE_KEYS.map((key, i) => {
         const [start, end] = phases.phases[key];
         const width = `${Math.max(0, ((end - start) / last) * 100)}%`;
         const isSelected = selected === key;
+        // The visual highlight previews on hover too, so the user can scrub
+        // the skeleton by sweeping the cursor across blocks without committing.
+        // But click-to-toggle must key off the persisted `selected` state only:
+        // at click time the cursor is already over the block, so using the
+        // hover-merged "active" flag would make every click look like a toggle-off.
+        const isActive = (hovered ?? selected) === key;
+        const isAnyActive = (hovered ?? selected) != null;
         // min-w keeps even a 1-frame phase wide enough to read and tap;
         // min-h gives a comfortable touch target when interactive.
         const className = cn(
           'relative flex items-center justify-center overflow-hidden px-1.5',
           interactive ? 'min-w-[36px] min-h-[44px] cursor-pointer' : 'min-w-[28px]',
           i > 0 ? 'border-l border-background/60' : '',
-          // Selected: ring + dimmed siblings so the eye lands on the phase.
-          interactive && isSelected
+          // Active (hovered-or-selected): ring + dimmed siblings so the eye
+          // lands on the phase.
+          interactive && isActive
             ? 'ring-2 ring-inset ring-primary z-10 bg-foreground/10'
-            : interactive && selected != null
+            : interactive && isAnyActive
               ? 'opacity-60'
               : '',
           interactive && 'transition-opacity',
@@ -79,6 +98,7 @@ export function PhaseBar({
             aria-pressed={isSelected}
             aria-label={label}
             onClick={() => onSelect?.(isSelected ? null : key)}
+            onMouseEnter={onHover ? () => onHover(key) : undefined}
           >
             <span className="truncate text-[11px] font-semibold text-foreground/70">
               {label}

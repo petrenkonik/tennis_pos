@@ -1,9 +1,9 @@
+import type { KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CheckCircle2, AlertTriangle, XCircle, HelpCircle } from 'lucide-react';
 import type { RuleResult, RuleStatus } from '../rules/types';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
 import { Badge, type BadgeProps } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 
 const STATUS_ICON = {
   ok: CheckCircle2,
@@ -35,16 +35,58 @@ function formatRange(r?: [number, number], unit = ''): string {
 export function RuleCard({
   rule,
   onSeek,
+  selected = false,
+  onSelect,
+  onHover,
 }: {
   rule: RuleResult;
+  // Kept for callers that only want seeking; onSelect is preferred and also seeks.
   onSeek?: (timestampMs: number) => void;
+  selected?: boolean;
+  onSelect?: (rule: RuleResult) => void;
+  onHover?: (ruleId: string | null) => void;
 }) {
   const { t } = useTranslation();
   const StatusIcon = STATUS_ICON[rule.status];
   const ms = rule.atTimestampMs;
 
+  // The whole card seeks + selects. Only rules with a timestamp are navigable.
+  const seekable = ms !== undefined && (onSelect !== undefined || onSeek !== undefined);
+
+  function activate() {
+    if (!seekable) return;
+    // onSelect carries both the selection (for highlighting) and the seek;
+    // fall back to a plain onSeek for any caller wiring only that.
+    if (onSelect) {
+      onSelect(rule);
+    } else if (ms !== undefined) {
+      onSeek?.(ms);
+    }
+  }
+
+  function onKeyDown(e: KeyboardEvent<HTMLDivElement>) {
+    if (!seekable) return;
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      activate();
+    }
+  }
+
   return (
-    <Card className={`flex flex-col overflow-hidden p-0 ${STATUS_ACCENT[rule.status]}`}>
+    <Card
+      className={[
+        'flex flex-col overflow-hidden p-0 transition-shadow',
+        STATUS_ACCENT[rule.status],
+        seekable ? 'cursor-pointer hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring' : '',
+        selected ? 'ring-2 ring-primary' : '',
+      ].join(' ')}
+      onClick={seekable ? activate : undefined}
+      onMouseEnter={() => onHover?.(rule.ruleId)}
+      onMouseLeave={() => onHover?.(null)}
+      role={seekable ? 'button' : undefined}
+      tabIndex={seekable ? 0 : undefined}
+      onKeyDown={seekable ? onKeyDown : undefined}
+    >
       <CardHeader className="gap-2 p-4">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
@@ -92,14 +134,12 @@ export function RuleCard({
 
       {ms !== undefined && (
         <CardFooter className="p-4 pt-0">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 -ml-2 font-mono text-primary hover:bg-primary/10"
-            onClick={() => onSeek?.(ms)}
-          >
+          {/* Non-interactive affordance hint: the whole card seeks on click, so
+              this is just a visual "▶ N.Ns" label, not a button (avoids a nested
+              clickable that would double-fire the card's onClick). */}
+          <span className="inline-flex h-8 items-center rounded-md px-2 font-mono text-primary">
             {t('report.seekSec', { n: (ms / 1000).toFixed(1) })}
-          </Button>
+          </span>
         </CardFooter>
       )}
     </Card>

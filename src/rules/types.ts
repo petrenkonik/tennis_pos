@@ -34,6 +34,10 @@ export interface RuleResult {
   metric?: RuleMetric;
   atFrame?: number;        // frame index the metric is measured at
   atTimestampMs?: number;  // its time in the clip — lets the UI seek the video there
+  // MediaPipe landmark indices this rule inspects — lets the skeleton overlay
+  // highlight the relevant bones/joints by the rule's status when the rule is
+  // selected/hovered. Not a user-facing string.
+  landmarks?: number[];
 }
 
 export interface ErrorRule {

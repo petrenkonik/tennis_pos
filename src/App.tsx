@@ -17,8 +17,10 @@ import {
   DEFAULT_PHASE_PLAYBACK_SPEED,
 } from './constants/playback';
 import { frameToMs, type PhaseKey } from './lib/phaseTime';
+import { PHASE_LANDMARKS } from './pose/phaseLandmarks';
 import { PhaseBar } from './ui/PhaseBar';
 import { AdviceList } from './ui/AdviceList';
+import type { RuleResult } from './rules/types';
 import { RulesReport } from './ui/RulesReport';
 import { SkeletonOverlay } from './ui/SkeletonOverlay';
 import { Button } from '@/components/ui/button';
@@ -35,6 +37,16 @@ import {
 } from 'lucide-react';
 
 type Status = 'idle' | 'processing' | 'done' | 'error';
+
+// Phase colors for the skeleton overlay. The phase bar uses oklch CSS variables
+// (index.css --phase-*); the canvas can't consume oklch, so these hex values
+// mirror those tokens for the canvas highlight. Update both if a token changes.
+const PHASE_COLOR_HEX: Record<PhaseKey, string> = {
+  preparation: '#3B6FD4',    // ≈ --phase-preparation oklch(0.55 0.09 240)
+  trophy: '#C99A2E',        // ≈ --phase-trophy oklch(0.6 0.11 90)
+  acceleration: '#C45A2A',  // ≈ --phase-acceleration oklch(0.58 0.13 20)
+  followThrough: '#3D9E5C', // ≈ --phase-follow-through oklch(0.6 0.11 150)
+};
 
 // task-rules §6: thresholds are named, not magic.
 // If `loadedmetadata` does not fire within this window, assume the file is
@@ -67,6 +79,18 @@ export default function App() {
   const [phaseSpeed, setPhaseSpeed] = useState(DEFAULT_PHASE_PLAYBACK_SPEED);
   const [phasePlayback, setPhasePlayback] = useState<{ endMs: number } | null>(null);
 
+  // Rule review: selecting a rule card seeks to its measurement moment and
+  // keeps its bones highlighted on the skeleton; hovering highlights them
+  // without seeking. Hover wins over selection so moving the cursor across a
+  // wall of cards previews each one, then snaps back to the selected rule.
+  const [selectedRuleId, setSelectedRuleId] = useState<string | null>(null);
+  const [hoveredRuleId, setHoveredRuleId] = useState<string | null>(null);
+
+  // Phase review hover: same pattern as rules — hovering a phase block
+  // highlights its body parts on the skeleton without seeking. Cleared on
+  // leave, falling back to the selected phase's highlight (or none).
+  const [hoveredPhase, setHoveredPhase] = useState<PhaseKey | null>(null);
+
   // Seek the video to a rule's measurement moment; the skeleton overlay
   // (rAF loop) redraws at that frame automatically.
   function seekTo(timestampMs: number) {
@@ -74,6 +98,13 @@ export default function App() {
     if (!video) return;
     video.pause();
     video.currentTime = timestampMs / 1000;
+  }
+
+  // Clicking a rule card: select it (for persistent highlight) and seek to its
+  // measurement moment. Rules without a timestamp just select.
+  function selectRule(rule: RuleResult) {
+    setSelectedRuleId(rule.ruleId);
+    if (rule.atTimestampMs !== undefined) seekTo(rule.atTimestampMs);
   }
 
   // Reset playback-rate + selection state to "whole video at 1×". Called on
@@ -130,6 +161,34 @@ export default function App() {
     video.playbackRate = selectedPhase ? phaseSpeed : 1;
   }, [selectedPhase, phaseSpeed]);
 
+  // Resolve what the skeleton overlay should highlight. Two sources — rules and
+  // phases — share one highlight channel. Within each, hover wins over the
+  // persisted selection (sweeping the cursor previews, then snaps back). Across
+  // sources, a hovered item always wins; when nothing is hovered, a selected
+  // rule wins over a selected phase (rules carry a verdict the eye should land
+  // on first). Order: hovered rule → hovered phase → selected rule → selected phase.
+  const ruleResults = result?.ok ? result.ruleResults : undefined;
+  const activeRuleId = hoveredRuleId ?? selectedRuleId;
+  const activeRule = activeRuleId
+    ? ruleResults?.find((r) => r.ruleId === activeRuleId)
+    : undefined;
+  const activePhase = hoveredPhase ?? selectedPhase;
+  const skeletonHighlight = (() => {
+    if (hoveredRuleId && activeRule?.landmarks) {
+      return { landmarks: activeRule.landmarks, status: activeRule.status };
+    }
+    if (hoveredPhase && activePhase) {
+      return { landmarks: PHASE_LANDMARKS[activePhase], color: PHASE_COLOR_HEX[activePhase] };
+    }
+    if (selectedRuleId && activeRule?.landmarks) {
+      return { landmarks: activeRule.landmarks, status: activeRule.status };
+    }
+    if (selectedPhase && activePhase) {
+      return { landmarks: PHASE_LANDMARKS[activePhase], color: PHASE_COLOR_HEX[activePhase] };
+    }
+    return null;
+  })();
+
   // Core load+analyze routine, shared by the file input and the demo button.
   // Accepts a Blob (File extends Blob) and the handedness to analyze with —
   // passed explicitly so loadDemo can apply the clip's handedness without
@@ -144,6 +203,9 @@ export default function App() {
     setStatus('processing');
     setProgress(0);
     clearPhaseSelection(video);
+    setSelectedRuleId(null);
+    setHoveredRuleId(null);
+    setHoveredPhase(null);
     if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
     const url = URL.createObjectURL(file);
     objectUrlRef.current = url;
@@ -430,6 +492,7 @@ export default function App() {
               poses={result.poses}
               phases={result.ok ? result.phases : undefined}
               visibilityThreshold={visTh}
+              highlight={skeletonHighlight}
             />
             )}
           </div>
@@ -463,6 +526,8 @@ export default function App() {
                 phases={result.phases}
                 selected={selectedPhase}
                 onSelect={handlePhaseSelect}
+                hovered={hoveredPhase}
+                onHover={setHoveredPhase}
               />
               <p className="text-xs text-muted-foreground">{t('controls.phaseHint')}</p>
             </section>
@@ -476,7 +541,13 @@ export default function App() {
                   {result.ruleResults.length}
                 </Badge>
               </div>
-              <RulesReport results={result.ruleResults} onSeek={seekTo} />
+              <RulesReport
+                results={result.ruleResults}
+                onSeek={seekTo}
+                selectedRuleId={selectedRuleId}
+                onSelect={selectRule}
+                onHover={setHoveredRuleId}
+              />
             </section>
 
             {result.findings.length > 0 && (
