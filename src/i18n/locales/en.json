@@ -18,7 +18,13 @@
     "visThreshold": "Joint visibility threshold: {{n}}",
     "visThresholdHelp": "Lower — more tolerant of \"uncertain\" joints.",
     "maxLowVis": "Share of \"bad\" frames for rejection: {{n}}",
-    "maxLowVisHelp": "Higher — try to analyze even noisy clips."
+    "maxLowVisHelp": "Higher — try to analyze even noisy clips.",
+    "tryDemo": "Try a demo serve"
+  },
+  "demo": {
+    "serveRightSide": {
+      "title": "Right-handed serve (side view)"
+    }
   },
   "status": {
     "processing": "Processing: {{n}}%",

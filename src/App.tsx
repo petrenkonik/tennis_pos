@@ -8,6 +8,7 @@ import {
   DEFAULT_UI_VISIBILITY_THRESHOLD,
   DEFAULT_UI_MAX_LOW_VIS_FRACTION,
 } from './constants/biomechanics';
+import { DEMO_CLIPS, type DemoClip } from './constants/demoClips';
 import { PhaseBar } from './ui/PhaseBar';
 import { AdviceList } from './ui/AdviceList';
 import { RulesReport } from './ui/RulesReport';
@@ -22,6 +23,7 @@ import {
   Loader2,
   AlertCircle,
   ChevronDown,
+  PlayCircle,
 } from 'lucide-react';
 
 type Status = 'idle' | 'processing' | 'done' | 'error';
@@ -59,10 +61,13 @@ export default function App() {
     video.currentTime = timestampMs / 1000;
   }
 
-  async function onFile(e: ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
+  // Core load+analyze routine, shared by the file input and the demo button.
+  // Accepts a Blob (File extends Blob) and the handedness to analyze with —
+  // passed explicitly so loadDemo can apply the clip's handedness without
+  // waiting for a React state flush (which would race the closure).
+  async function loadVideoFile(file: Blob, hand: Handedness) {
     const video = videoRef.current;
-    if (!file || !video) return;
+    if (!video) return;
 
     setResult(null);
     setStatus('processing');
@@ -83,7 +88,7 @@ export default function App() {
         video.onerror = () => { clearTimeout(timer); rej(new Error('video decode error')); };
       });
 
-      const r = await analyzeServe(video, handedness, setProgress, {
+      const r = await analyzeServe(video, hand, setProgress, {
         model,
         visibilityThreshold: visTh,
         maxLowVisFraction: maxLowVis,
@@ -98,6 +103,33 @@ export default function App() {
       }
     } catch (err) {
       // metadata load / decode failure from the await above
+      setStatus('error');
+      setErrorMsg(t('errors.video-read-failed'));
+      setErrorDetail(String(err));
+    }
+  }
+
+  async function onFile(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    await loadVideoFile(file, handedness);
+  }
+
+  // Fetch a bundled demo .mp4 from public/ and run it through the same pipeline
+  // as an uploaded file. The clip's handedness overrides the toggle so the UI
+  // and the analysis agree on which arm is the racket arm. A failed fetch
+  // (e.g. the .mp4 is not yet in public/demo/clips/) surfaces as a clean
+  // video-read-failed error instead of crashing.
+  async function loadDemo(clip: DemoClip) {
+    setHandedness(clip.handedness);
+    try {
+      const resp = await fetch(clip.path);
+      if (!resp.ok) throw new Error(`demo fetch failed: ${resp.status}`);
+      const blob = await resp.blob();
+      const name = clip.path.split('/').pop() ?? 'demo.mp4';
+      const file = new File([blob], name, { type: blob.type || 'video/mp4' });
+      await loadVideoFile(file, clip.handedness);
+    } catch (err) {
       setStatus('error');
       setErrorMsg(t('errors.video-read-failed'));
       setErrorDetail(String(err));
@@ -162,6 +194,20 @@ export default function App() {
                 {t('controls.videoFormats')}
               </span>
             </button>
+
+            {/* One-click demo: fetch a bundled serve clip from public/ and run
+                the full pipeline without the user picking a file. */}
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="mx-auto"
+              onClick={() => void loadDemo(DEMO_CLIPS[0])}
+              disabled={isBusy}
+            >
+              <PlayCircle className="h-4 w-4" />
+              {t('controls.tryDemo')}
+            </Button>
 
             {/* Handedness toggle. */}
             <div className="flex flex-wrap items-center gap-2">
