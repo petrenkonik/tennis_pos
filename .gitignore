@@ -29,3 +29,6 @@ npm-debug.log*
 # Env
 .env
 .env.*
+
+# Git worktrees (local isolated workspaces)
+.worktrees/
