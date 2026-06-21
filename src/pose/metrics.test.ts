@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { kneeJointAngle, elbowExtension, racketWristHeight, tossWristHeight } from './metrics';
+import { jointAngle } from './geometry';
 import { LM } from './landmarks';
 import type { PoseFrame, Landmark } from '../types';
 
@@ -41,12 +42,17 @@ describe('pose metrics', () => {
     expect(Number.isNaN(kneeJointAngle(f))).toBe(true);
   });
 
-  it('kneeJointAngle picks the more bent leg when both are equally visible', () => {
+  it('kneeJointAngle returns the more-bent leg exactly when both are equally visible', () => {
     const f = frame(makeLandmarks({
-      [LM.L_HIP]: { x: 0.5, y: 0.4 }, [LM.L_KNEE]: { x: 0.5, y: 0.6 }, [LM.L_ANKLE]: { x: 0.5, y: 0.8 }, // straight
-      [LM.R_HIP]: { x: 0.5, y: 0.4 }, [LM.R_KNEE]: { x: 0.5, y: 0.6 }, [LM.R_ANKLE]: { x: 0.72, y: 0.78 }, // bent
+      [LM.L_HIP]: { x: 0.5, y: 0.4 }, [LM.L_KNEE]: { x: 0.5, y: 0.6 }, [LM.L_ANKLE]: { x: 0.55, y: 0.8 }, // slightly bent (larger angle)
+      [LM.R_HIP]: { x: 0.5, y: 0.4 }, [LM.R_KNEE]: { x: 0.5, y: 0.6 }, [LM.R_ANKLE]: { x: 0.72, y: 0.78 }, // more bent (smaller angle)
     }));
-    expect(kneeJointAngle(f)).toBeLessThan(160);
+    const rightAngle = jointAngle(
+      { x: 0.5, y: 0.4, z: 0, visibility: 1 },
+      { x: 0.5, y: 0.6, z: 0, visibility: 1 },
+      { x: 0.72, y: 0.78, z: 0, visibility: 1 },
+    );
+    expect(kneeJointAngle(f)).toBeCloseTo(rightAngle, 5);
   });
 
   it('elbowExtension returns 180 for a straight racket arm', () => {

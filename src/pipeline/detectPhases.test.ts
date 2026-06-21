@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { detectPhases, ServeNotRecognizedError, visibilityBreakdown } from './detectPhases';
-import { buildHappyServe, buildLandingCrouchServe, buildTossGateServe, buildKneeAfterTrophyServe, makeFrame, makeLandmarks } from '../__tests__/fixtures/poses';
+import { buildHappyServe, buildLandingCrouchServe, buildTossGateServe, buildKneeAfterTrophyServe, buildNoConfidentContactServe, makeFrame, makeLandmarks } from '../__tests__/fixtures/poses';
 import { LM } from '../pose/landmarks';
 
 describe('detectPhases', () => {
@@ -120,5 +120,16 @@ describe('detectPhases', () => {
     expect(r.events.trophyFrame).toBe(2);
     expect(r.events.contactFrame).toBe(5);
     expect(r.confidence).toBe('high');
+  });
+
+  it('flags low confidence when no height peak has an extended elbow (degraded contact)', () => {
+    const r = detectPhases(buildNoConfidentContactServe(), 'right');
+    expect(r.confidence).toBe('low');                         // contact not confident
+    expect(r.events.contactFrame).toBe(4);                    // global-max height fallback
+    expect(r.events.trophyFrame).toBe(2);                     // still bounded before contact
+    expect(r.events.trophyFrame).toBeLessThan(r.events.contactFrame);
+    expect(r.events.contactFrame).toBeLessThan(r.events.followStartFrame);
+    // phases must not collapse to a degenerate [n, n] interval
+    expect(r.phases.acceleration[1]).toBeGreaterThan(r.phases.acceleration[0]);
   });
 });

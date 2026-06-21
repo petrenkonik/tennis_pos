@@ -35,7 +35,7 @@ export function racketWristHeight(f: PoseFrame, h: Handedness): number {
 }
 
 // Toss-arm wrist height (1 - y); larger = arm raised higher. Used by the trophy
-// toss-arm-extended gate.
+// toss-arm-peak anchor.
 export function tossWristHeight(f: PoseFrame, h: Handedness): number {
   return 1 - tossWrist(f, h).y;
 }

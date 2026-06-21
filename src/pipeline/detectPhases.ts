@@ -174,7 +174,11 @@ export function detectPhases(
 
   // 2) contact first (trophy-independent), then trophy bounded before it.
   const contact = detectContact(poses, h);
-  const searchEnd = contact.confident ? contact.frame : last + 1;
+  // Bound the trophy search by contact even when contact is low-confidence: the
+  // best-effort global-max contact frame is still a better ceiling than the whole
+  // clip, which could otherwise anchor trophy on a post-contact toss motion and
+  // force a degenerate (clamped) phase split.
+  const searchEnd = contact.frame;
   const trophy = detectTrophy(poses, h, searchEnd);
   if (trophy.frame < 0) return timeBasedFallback(poses, h);
 

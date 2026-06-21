@@ -110,3 +110,21 @@ export function buildKneeAfterTrophyServe(): PoseFrame[] {
   return specs.map(([bend, wY, eY, tY], i) =>
     makeFrame(i, makeLandmarks({ ...nose, ...knee(bend), ...arm(wY, eY), ...toss(tY) })));
 }
+
+// Right-handed serve where the only racket-wrist height peak (f4) has a BENT
+// elbow (~98 deg), so no peak clears CONTACT_ELBOW_MIN_DEG: detectContact takes
+// the global-max fallback and returns confident=false. Exercises the degraded
+// path (the fallback branch + the contact-not-confident trophy bound). The result
+// is still well-ordered and flagged confidence 'low'. trophy=2, contact=4, follow=6.
+export function buildNoConfidentContactServe(): PoseFrame[] {
+  const frames: Array<Record<number, Partial<Landmark>>> = [
+    { ...nose, ...knee('straight'), ...arm(0.70, 0.62), ...toss(0.70) }, // f0 prep, height .30
+    { ...nose, ...knee('bent'),     ...arm(0.55, 0.52), ...toss(0.45) }, // f1 rising (not overhead), .45
+    { ...nose, ...knee('bent'),     ...arm(0.45, 0.42), ...toss(0.12) }, // f2 TROPHY overhead, toss peak, .55
+    { ...nose, ...knee('bent'),     ...arm(0.40, 0.42), ...toss(0.40) }, // f3 overhead, .60
+    { ...nose, ...knee('straight'), ...arm(0.20, 0.35), [LM.R_ELBOW]: { x: 0.65, y: 0.35 }, ...toss(0.55) }, // f4 height peak, BENT elbow, .80
+    { ...nose, ...knee('straight'), ...arm(0.45, 0.50), ...toss(0.60) }, // f5 descent (still above shoulder), .55
+    { ...nose, ...knee('straight'), ...arm(0.62, 0.58), ...toss(0.60) }, // f6 follow start: wrist below shoulder, .38
+  ];
+  return frames.map((o, i) => makeFrame(i, makeLandmarks(o)));
+}
