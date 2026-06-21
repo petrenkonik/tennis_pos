@@ -191,4 +191,108 @@ describe('<App/> upload flow', () => {
       expect(screen.getByText(/Could not recognize the serve/i)).toBeInTheDocument();
     });
   });
+
+  it('clicking a phase block seeks the video to the phase start and slows playback', async () => {
+    vi.mocked(analyzeServe).mockResolvedValue(successResult);
+    const user = userEvent.setup();
+
+    render(<App />);
+    const input = screen.getByLabelText(/upload serve video/i) as HTMLInputElement;
+    await act(async () => {
+      await user.upload(input, new File(['dummy'], 'serve.mp4', { type: 'video/mp4' }));
+    });
+    await waitFor(() => {
+      expect(screen.getByText(/^Rules \(0\)$/i)).toBeInTheDocument();
+    });
+
+    const video = document.querySelector('video') as HTMLVideoElement;
+    expect(video).toBeTruthy();
+
+    // trophy phase = [2, 3]; frameToMs(2) uses poses[2].timestampMs.
+    const expectedStartSec = successResult.poses[2].timestampMs / 1000;
+
+    await act(async () => {
+      await user.click(screen.getByText('Trophy'));
+    });
+
+    // Seeked to the trophy phase start and slowed to the default 0.5× rate.
+    expect(video.currentTime).toBeCloseTo(expectedStartSec, 3);
+    expect(video.playbackRate).toBeCloseTo(0.5, 2);
+
+    // Clicking the same block again clears the selection and restores 1×.
+    await act(async () => {
+      await user.click(screen.getByText('Trophy'));
+    });
+    expect(video.playbackRate).toBeCloseTo(1, 2);
+  });
+});
+
+/*
+ * Demo-button flow. Mirrors the upload-flow tests above, but the entry point is
+ * the "Try a demo serve" button: loadDemo() fetches the .mp4 from public/ (which
+ * jsdom does NOT serve), so fetch is stubbed explicitly per test. The jsdom
+ * video shim from the upload suite still applies here — it fires
+ * `loadedmetadata` on any `video.src` assignment, including the blob URL built
+ * from a fetched response.
+ */
+describe('<App/> demo-button flow', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    installJsdomVideoShim();
+    installCanvasStub();
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it('loads the demo clip and runs analyzeServe', async () => {
+    vi.mocked(analyzeServe).mockResolvedValue(successResult);
+    // jsdom does not serve public/, so a real fetch would 404 in tests. Stub
+    // it to return a tiny blob that loadDemo wraps in a File and feeds to
+    // loadVideoFile — same path as the real flow, minus the bytes.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        blob: () => Promise.resolve(new Blob(['dummy'], { type: 'video/mp4' })),
+      }),
+    );
+
+    const user = userEvent.setup();
+    render(<App />);
+
+    await act(async () => {
+      await user.click(screen.getByRole('button', { name: /try a demo serve/i }));
+    });
+
+    // fetch hit the manifest path, analyzeServe was reached exactly once.
+    await waitFor(() => {
+      expect(analyzeServe).toHaveBeenCalledTimes(1);
+    });
+    expect(vi.mocked(fetch)).toHaveBeenCalledWith('/demo/clips/serve-right-side.mp4');
+  });
+
+  it('shows an error when the demo fetch fails (e.g. the .mp4 is absent)', async () => {
+    // Simulate the manifest path not being served (the real state until the
+    // user drops serve-right-side.mp4 into public/demo/clips/).
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: false, status: 404 }),
+    );
+
+    const user = userEvent.setup();
+    render(<App />);
+
+    await act(async () => {
+      await user.click(screen.getByRole('button', { name: /try a demo serve/i }));
+    });
+
+    // loadDemo maps any non-ok fetch to errors.video-read-failed (en.json).
+    await waitFor(() => {
+      expect(screen.getByText(/Could not read the video/i)).toBeInTheDocument();
+    });
+    // And the pipeline must NOT have been called — we bailed before reaching it.
+    expect(analyzeServe).not.toHaveBeenCalled();
+  });
 });

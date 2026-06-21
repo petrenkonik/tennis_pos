@@ -1,0 +1,3 @@
+# Placeholder so the demo-clips directory exists in git before the real .mp4
+# is added. Drop the actual serve clip here as serve-right-side.mp4
+# (referenced by src/constants/demoClips.ts).

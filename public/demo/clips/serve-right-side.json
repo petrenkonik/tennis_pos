@@ -1,0 +1,50 @@
+{
+  "$schema": "https://tennis_pos.local/demo-clip.v1.json",
+  "id": "serve-right-side",
+  "titleKey": "demo.serveRightSide.title",
+  "path": "/demo/clips/serve-right-side.mp4",
+  "handedness": "right",
+  "description": "Single right-handed serve recorded from the side, the canonical framing for the pipeline (player fully in frame, knees to head visible). Used by the one-click 'Try a demo serve' button in App.",
+  "video": {
+    "codec": "h264",
+    "profile": "High",
+    "container": "mp4 (isom/iso2/avc1/mp41)",
+    "width": 1280,
+    "height": 720,
+    "aspectRatio": "16:9",
+    "pixelFormat": "yuv420p",
+    "scan": "progressive",
+    "frameRate": 24,
+    "frameRateExact": "24/1",
+    "nbFrames": 60,
+    "durationSec": 2.458333,
+    "bitRate": 4865455
+  },
+  "audio": {
+    "codec": "aac",
+    "profile": "LC",
+    "sampleRateHz": 48000,
+    "channels": 2,
+    "channelLayout": "stereo",
+    "bitRate": 127163,
+    "durationSec": 2.496
+  },
+  "file": {
+    "name": "serve-right-side.mp4",
+    "sizeBytes": 1537443,
+    "sizeKb": 1501.4,
+    "totalDurationSec": 2.517,
+    "totalBitRate": 4886588,
+    "encoder": "Lavf58.45.100"
+  },
+  "pipeline": {
+    "expectedFps": 24,
+    "withinMaxClipSeconds": true,
+    "maxClipSecondsLimit": 30,
+    "notes": "Frame rate (24fps) is what MediaPipe samples against; the pipeline reports fps≈24, not the 30fps assumed by synthetic fixtures. Duration 2.5s is well under the 30s browser-memory guard (MAX_CLIP_SECONDS)."
+  },
+  "source": {
+    "originalName": "Untitled Project.mp4",
+    "acquired": "user-supplied (copied from E:/Downloads/ on 2026-06-21)"
+  }
+}
