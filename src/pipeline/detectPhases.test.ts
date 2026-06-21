@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { detectPhases, ServeNotRecognizedError, visibilityBreakdown } from './detectPhases';
-import { buildHappyServe, buildLandingCrouchServe, buildTossGateServe, makeFrame, makeLandmarks } from '../__tests__/fixtures/poses';
+import { buildHappyServe, buildLandingCrouchServe, buildTossGateServe, buildKneeAfterTrophyServe, makeFrame, makeLandmarks } from '../__tests__/fixtures/poses';
 import { LM } from '../pose/landmarks';
 
 describe('detectPhases', () => {
@@ -110,6 +110,15 @@ describe('detectPhases', () => {
     const r = detectPhases(buildTossGateServe(), 'right');
     expect(r.events.trophyFrame).toBe(2);
     expect(r.events.contactFrame).toBe(4);
+    expect(r.confidence).toBe('high');
+  });
+
+  it('anchors trophy on the toss-arm peak, not the deepest knee in the window', () => {
+    // f2 is the toss-arm peak (trophy pose); f4 is overhead with a deeper knee
+    // (racket-drop load). Trophy must be f2, proving the anchor is the toss peak.
+    const r = detectPhases(buildKneeAfterTrophyServe(), 'right');
+    expect(r.events.trophyFrame).toBe(2);
+    expect(r.events.contactFrame).toBe(5);
     expect(r.confidence).toBe('high');
   });
 });

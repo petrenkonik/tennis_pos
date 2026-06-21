@@ -5,7 +5,7 @@ import { localMaxima } from '../pose/geometry';
 import {
   CONTACT_ELBOW_MIN_DEG, CONTACT_HEIGHT_PROMINENCE, VISIBILITY_THRESHOLD,
   MAX_LOW_VIS_FRACTION, FALLBACK_PREP_FRACTION, FALLBACK_ACCEL_FRACTION,
-  DIAGNOSTIC_MIN_LOW_FRAC, TROPHY_OVERHEAD_REF_LM, TOSS_ARM_PEAK_BAND,
+  DIAGNOSTIC_MIN_LOW_FRAC, TROPHY_OVERHEAD_REF_LM,
 } from '../constants/biomechanics';
 
 // Machine-readable diagnostic codes that the UI (App.tsx) resolves via t().
@@ -105,35 +105,37 @@ function detectContact(poses: PoseFrame[], h: Handedness): { frame: number; conf
   return { frame, confident: false };
 }
 
-// Trophy = within [0, searchEnd): an "overhead AND toss-arm-extended" frame with
-// the deepest robust knee bend. Bounding by contact removes the post-contact
-// landing-crouch knee minimum; the toss-arm gate removes unrelated overhead frames.
-// Returns frame -1 when no frame is overhead at all (trophy "not expressed") so
-// the caller can use the time-based fallback.
+// Trophy = the overhead frame nearest the toss-arm's vertical peak within
+// [0, searchEnd). The toss arm reaches full extension at the trophy POSE (racket
+// behind the head); the deepest knee bend comes a few frames LATER, during the
+// racket drop / leg load, so anchoring on the toss peak (not the knee minimum)
+// keeps trophy on the pose itself. Knee depth is only a tie-break between frames
+// equidistant from the peak. Returns frame -1 when no frame is overhead (trophy
+// "not expressed") so the caller can use the time-based fallback.
 function detectTrophy(
   poses: PoseFrame[], h: Handedness, searchEnd: number,
 ): { frame: number; confident: boolean } {
   const end = Math.min(searchEnd, poses.length);
-  let peakToss = -Infinity;
-  for (let i = 0; i < end; i++) peakToss = Math.max(peakToss, tossWristHeight(poses[i], h));
-  const tossFloor = peakToss - TOSS_ARM_PEAK_BAND;
+  if (end <= 0) return { frame: -1, confident: false };
 
-  let frame = -1, minAngle = Infinity;
-  let anyOverhead = false, tossPeakFrame = -1, tossPeakH = -Infinity;
+  let tossPeakFrame = 0, tossPeakH = -Infinity;
   for (let i = 0; i < end; i++) {
-    const tossH = tossWristHeight(poses[i], h);
-    if (tossH > tossPeakH) { tossPeakH = tossH; tossPeakFrame = i; }
-    const overhead = racketWrist(poses[i], h).y < poses[i].landmarks[TROPHY_OVERHEAD_REF_LM].y;
-    if (overhead) anyOverhead = true;
-    if (!overhead || tossH < tossFloor) continue;
-    const ang = kneeJointAngle(poses[i]);
-    if (Number.isNaN(ang)) continue;
-    if (ang < minAngle) { minAngle = ang; frame = i; }
+    const th = tossWristHeight(poses[i], h);
+    if (th > tossPeakH) { tossPeakH = th; tossPeakFrame = i; }
   }
-  if (frame >= 0) return { frame, confident: true };
-  if (!anyOverhead) return { frame: -1, confident: false }; // not expressed → caller falls back
-  // Overhead frames existed but knees were unreadable → use the toss peak, low conf.
-  return { frame: tossPeakFrame, confident: false };
+
+  let frame = -1, bestDist = Infinity, bestKnee = Infinity;
+  for (let i = 0; i < end; i++) {
+    const overhead = racketWrist(poses[i], h).y < poses[i].landmarks[TROPHY_OVERHEAD_REF_LM].y;
+    if (!overhead) continue;
+    const dist = Math.abs(i - tossPeakFrame);
+    const knee = kneeJointAngle(poses[i]);
+    const kneeVal = Number.isNaN(knee) ? Infinity : knee;
+    if (dist < bestDist || (dist === bestDist && kneeVal < bestKnee)) {
+      bestDist = dist; bestKnee = kneeVal; frame = i;
+    }
+  }
+  return frame >= 0 ? { frame, confident: true } : { frame: -1, confident: false };
 }
 
 export function detectPhases(

@@ -87,3 +87,22 @@ export function buildTossGateServe(): PoseFrame[] {
   return specs.map(([bend, wY, eY, tY], i) =>
     makeFrame(i, makeLandmarks({ ...nose, ...knee(bend), ...arm(wY, eY), ...toss(tY) })));
 }
+
+// Right-handed serve where the toss-arm peak (f2) is the trophy pose, but a LATER
+// overhead frame (f4) has a deeper knee bend (the racket-drop load). The toss-peak
+// anchor must pick f2; the old "deepest knee in window" rule would have picked f4.
+// Also exercises the C3 trophy->contact knee window (deepest in [2,5) is f4).
+// trophy=2, contact=5, followStart=6.
+export function buildKneeAfterTrophyServe(): PoseFrame[] {
+  const specs: Array<['straight'|'bent'|'deep', number, number, number]> = [
+    ['straight', 0.70, 0.62, 0.70], // f0 prep
+    ['bent',     0.55, 0.50, 0.45], // f1 rising (not overhead), toss rising
+    ['bent',     0.45, 0.42, 0.10], // f2 TROPHY: overhead, toss arm PEAK (highest)
+    ['bent',     0.42, 0.40, 0.40], // f3 overhead, toss dropping, knee a bit deeper
+    ['deep',     0.40, 0.38, 0.55], // f4 overhead, DEEPEST knee (racket-drop load)
+    ['straight', 0.12, 0.32, 0.55], // f5 CONTACT: highest + straight elbow
+    ['straight', 0.62, 0.58, 0.60], // f6 follow start: wrist below shoulder
+  ];
+  return specs.map(([bend, wY, eY, tY], i) =>
+    makeFrame(i, makeLandmarks({ ...nose, ...knee(bend), ...arm(wY, eY), ...toss(tY) })));
+}
