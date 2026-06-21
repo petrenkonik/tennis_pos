@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+
+# Vite / TS cache
+.vite/
+*.tsbuildinfo
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.local
+
+# Agent tooling (local-only)
+.claude/
+.zcode/
+
+# Bash crash dumps (cygwin/msys)
+*.stackdump
+
+# Env
+.env
+.env.*

@@ -1,0 +1,40 @@
+.app { max-width: 720px; margin: 0 auto; padding: 1rem; font-family: sans-serif; }
+.controls { display: flex; gap: 1rem; align-items: center; margin-bottom: 1rem; }
+.stage { position: relative; }
+.video { width: 100%; display: block; }
+.skeleton-overlay { position: absolute; top: 0; left: 0; pointer-events: none; }
+.phase-bar { display: flex; width: 100%; height: 28px; margin: 1rem 0; border: 1px solid #ccc; }
+.phase-seg {
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; overflow: hidden;
+  /* Phase-as-event intervals (e.g. trophy) collapse to ~0 width because the
+     phase is 1 frame wide — guarantee a visible sliver so the label is legible. */
+  min-width: 24px;
+}
+.phase-seg--preparation { background: #cfe8ff; }
+.phase-seg--trophy { background: #ffe7a3; }
+.phase-seg--acceleration { background: #ffc1c1; }
+.phase-seg--followThrough { background: #d6f5d6; }
+.report-title { font-size: 1rem; margin: 1rem 0 0.5rem; }
+.rules-report { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.rules-report th, .rules-report td { text-align: left; padding: 0.4rem 0.5rem; border-bottom: 1px solid #eee; }
+.rules-report th { color: #666; font-weight: 600; }
+.rule-row--ok { background: #f3fbf3; }
+.rule-row--warn { background: #fff6e6; }
+.rule-row--error { background: #fdeded; }
+.rule-row--unknown { background: #f5f5f5; color: #888; }
+.seek-btn { cursor: pointer; border: 1px solid #bbb; background: #fff; border-radius: 4px; padding: 0.15rem 0.5rem; font-size: 0.8rem; }
+.seek-btn:hover { background: #eef; }
+.advice-list { list-style: none; padding: 0; }
+.advice { border-left: 4px solid #999; padding: 0.5rem 0.75rem; margin: 0.5rem 0; background: #fafafa; }
+.advice--error { border-color: #d00; }
+.advice--warn { border-color: #e69500; }
+.error { color: #d00; }
+.error-detail { color: #888; font-size: 0.85rem; margin-top: 0.25rem; }
+.settings { margin-bottom: 1rem; }
+.settings summary { cursor: pointer; font-size: 0.9rem; color: #444; }
+.settings-grid { display: flex; flex-direction: column; gap: 0.75rem; margin-top: 0.75rem; }
+.settings-grid label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.85rem; }
+.settings-grid small { color: #888; }
+.settings-grid input[type="range"] { width: 100%; max-width: 320px; }
+.settings-grid select { max-width: 320px; padding: 0.25rem; }
