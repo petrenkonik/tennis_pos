@@ -13,10 +13,10 @@ function df(i: number, ball: Detection | null, racket: Detection | null = null):
 
 describe('buildTracks', () => {
   it('linearly interpolates a single-frame interior gap', () => {
-    const frames = [df(0, box(0.2, 0.2)), df(1, null), df(2, box(0.4, 0.4))];
+    const frames = [df(0, box(0.2, 0.2)), df(1, null), df(2, box(0.3, 0.3))];
     const { ballTrack } = buildTracks(frames);
     expect(ballTrack.points[1]?.interpolated).toBe(true);
-    expect(ballTrack.points[1]?.center.x).toBeCloseTo(0.3, 5);
+    expect(ballTrack.points[1]?.center.x).toBeCloseTo(0.25, 5);
     expect(ballTrack.coverage).toBeCloseTo(2 / 3, 5);
   });
 
