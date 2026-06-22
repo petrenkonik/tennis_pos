@@ -23,6 +23,7 @@ import { AdviceList } from './ui/AdviceList';
 import type { RuleResult } from './rules/types';
 import { RulesReport } from './ui/RulesReport';
 import { SkeletonOverlay } from './ui/SkeletonOverlay';
+import { DetectionOverlay } from './ui/DetectionOverlay';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -67,6 +68,7 @@ export default function App() {
   const [errorMsg, setErrorMsg] = useState('');
   const [errorDetail, setErrorDetail] = useState('');
   const [showSettings, setShowSettings] = useState(false);
+  const [showDetections, setShowDetections] = useState(true);
   // Defaults tuned for amateur side-view clips: accurate model + lenient gate.
   const [model, setModel] = useState<PoseModel>(DEFAULT_MODEL);
   const [visTh, setVisTh] = useState(DEFAULT_UI_VISIBILITY_THRESHOLD);
@@ -364,6 +366,15 @@ export default function App() {
                 {t('controls.leftHanded')}
               </Button>
 
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={showDetections}
+                  onChange={(e) => setShowDetections(e.target.checked)}
+                />
+                {t('detection.toggle')}
+              </label>
+
               <Button
                 variant="ghost"
                 size="sm"
@@ -495,6 +506,15 @@ export default function App() {
               highlight={skeletonHighlight}
             />
             )}
+          {result?.ok && showDetections && (
+            <DetectionOverlay
+              videoRef={videoRef}
+              ballTrack={result.ballTrack}
+              racketTrack={result.racketTrack}
+              poses={result.poses}
+              handedness={result.phases.handedness}
+            />
+          )}
           </div>
 
         {/* Error block. */}

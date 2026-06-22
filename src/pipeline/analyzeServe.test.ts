@@ -56,4 +56,31 @@ describe('analyzeServe', () => {
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error.kind).toBe('analysis-failed');
   });
+
+  it('builds ball/racket tracks from the extractor detections', async () => {
+    const poses = buildHappyServe();
+    const detections = poses.map(p => ({
+      frameIndex: p.frameIndex, timestampMs: p.timestampMs,
+      ball: { box: { x: 0.5, y: 0.3, w: 0.05, h: 0.05 }, score: 0.9 },
+      racket: null,
+    }));
+    const extract = async () => ({ poses, fps: 30, detections });
+    const r = await analyzeServe(video(5), 'right', undefined, { deps: { extract } });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.ballTrack.points.length).toBe(detections.length);
+      expect(r.ballTrack.coverage).toBeCloseTo(1, 5);
+      expect(r.racketTrack.coverage).toBe(0);
+    }
+  });
+
+  it('returns empty tracks when the extractor yields no detections', async () => {
+    const extract = async () => ({ poses: buildHappyServe(), fps: 30 });
+    const r = await analyzeServe(video(5), 'right', undefined, { deps: { extract } });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.ballTrack.points).toEqual([]);
+      expect(r.ballTrack.coverage).toBe(0);
+    }
+  });
 });
