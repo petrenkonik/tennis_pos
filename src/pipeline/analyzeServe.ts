@@ -1,11 +1,13 @@
-import type { Handedness, PoseFrame, Phases } from '../types';
+import type { Handedness, PoseFrame, Phases, DetectionFrame, BallTrack, RacketTrack } from '../types';
 import type { Finding, RuleResult } from '../rules/types';
 import { smooth } from './smooth';
 import { detectPhases, ServeNotRecognizedError, type ServeRejectDetail } from './detectPhases';
 import { buildPhaseContext } from './buildPhaseContext';
 import { runRules, runRulesReport } from './runRules';
 import { ALL_RULES } from '../rules';
-import { extractPoses, type PoseModel } from './extractPoses';
+import type { PoseModel } from './extractPoses';
+import { buildTracks } from './buildTracks';
+import { extractFrameData } from './extractFrameData';
 import { MAX_CLIP_SECONDS } from '../constants/biomechanics';
 
 // `serve-not-recognized` carries a machine-readable detail ({ code, params })
@@ -20,16 +22,17 @@ export type AnalysisError =
 
 export type AnalysisResult =
   // ruleResults = every rule's outcome (pass/fail + params); findings = the warn/error subset.
-  | { ok: true; phases: Phases; findings: Finding[]; ruleResults: RuleResult[]; poses: PoseFrame[] }
+  | { ok: true; phases: Phases; findings: Finding[]; ruleResults: RuleResult[];
+      poses: PoseFrame[]; ballTrack: BallTrack; racketTrack: RacketTrack }
   // poses are carried on failure too (empty if nothing was extracted) so the UI
   // can still draw the detected skeleton for diagnostics.
   | { ok: false; error: AnalysisError; poses: PoseFrame[] };
 
 export interface AnalyzeDeps {
   extract: (v: HTMLVideoElement, onProgress?: (f: number) => void, model?: PoseModel) =>
-    Promise<{ poses: PoseFrame[]; fps: number }>;
+    Promise<{ poses: PoseFrame[]; fps: number; detections?: DetectionFrame[] }>;
 }
-const defaultDeps: AnalyzeDeps = { extract: extractPoses };
+const defaultDeps: AnalyzeDeps = { extract: extractFrameData };
 
 // UI-tunable knobs. Omitted fields fall back to calibrated defaults.
 export interface AnalyzeOptions {
@@ -53,7 +56,7 @@ export async function analyzeServe(
     return { ok: false, error: { kind: 'video-too-long', detail: `>${MAX_CLIP_SECONDS}s` }, poses: [] };
   }
 
-  let raw: { poses: PoseFrame[]; fps: number };
+  let raw: { poses: PoseFrame[]; fps: number; detections?: DetectionFrame[] };
   try {
     raw = await deps.extract(video, onProgress, options.model);
   } catch (e) {
@@ -77,7 +80,8 @@ export async function analyzeServe(
     const ctx = buildPhaseContext(smoothed, raw.fps, phases);
     const findings = runRules(ctx, ALL_RULES);
     const ruleResults = runRulesReport(ctx, ALL_RULES);
-    return { ok: true, phases, findings, ruleResults, poses: smoothed };
+    const { ballTrack, racketTrack } = buildTracks(raw.detections ?? []);
+    return { ok: true, phases, findings, ruleResults, poses: smoothed, ballTrack, racketTrack };
   } catch (e) {
     if (e instanceof ServeNotRecognizedError) {
       console.warn('[analyzeServe] serve not recognized:', e.detail);
