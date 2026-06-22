@@ -24,11 +24,13 @@ export const TRACK_MAX_GAP_FRAMES = 8;
 export const TRACK_SMOOTH_WINDOW = 5;
 
 // --- Model (MediaPipe ObjectDetector, EfficientDet-Lite0, COCO, Apache-2.0) --
-// Pinned exactly like MEDIAPIPE_VERSION in extractPoses: '@latest'/'1' drift
-// would move the model away from the API we compile against. Loading from a CDN
-// is allowed by task-rules §4.
+// Pinned exactly like MEDIAPIPE_VERSION in extractPoses: the '/1/' path segment
+// pins the model revision; '@latest' drift would move the model away from the
+// API we compile against. Loading from a CDN is allowed by task-rules §4.
+// NOTE: the ObjectDetector model is a `.tflite` asset (unlike PoseLandmarker's
+// `.task`); the `.task` extension 404s on this host.
 export const OBJECT_MODEL_URL =
-  'https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/float16/1/efficientdet_lite0.task';
+  'https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/float16/1/efficientdet_lite0.tflite';
 
 // COCO category names emitted by EfficientDet-Lite0 for the two tracked objects.
 // Used as the ObjectDetector categoryAllowlist and to bucket detections.
