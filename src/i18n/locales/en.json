@@ -75,6 +75,51 @@
       "title": "Knee bend",
       "metricName": "Knee flexion at \"trophy\"",
       "advice": "Knees are barely bent — the legs contribute almost no energy to the hit. Bend the knees deeper in the \"trophy\" position to push upward toward the ball."
+    },
+    "C1": {
+      "title": "Contact height",
+      "metricName": "Reach above shoulder at contact",
+      "advice": "The hit happens too low — you strike with a bent arm. Reach for the ball with a fully extended arm at the top."
+    },
+    "C2": {
+      "title": "Contact position",
+      "metricName": "Contact point relative to body",
+      "advice": "The strike point is behind the body — the ball goes into the net or flies too long. Try to hit the ball slightly in front of you."
+    },
+    "TO2": {
+      "title": "Toss height",
+      "metricName": "Toss peak height above shoulder",
+      "advice": "The toss is too low — there isn't enough time for a full swing. Toss higher so the racket can make a full circle."
+    },
+    "TO1": {
+      "title": "Toss placement",
+      "metricName": "Toss peak position relative to body",
+      "advice": "The ball is tossed too far back. Try tossing it slightly forward and to the side — the hit will then be on-line and with weight."
+    },
+    "T3": {
+      "title": "Toss arm",
+      "metricName": "Toss-arm height at contact (share of peak)",
+      "advice": "After the toss, keep the toss arm up a little longer — it helps keep the ball in view and steers the direction of the hit."
+    },
+    "T1": {
+      "title": "Racket drop",
+      "metricName": "Racket drop below elbow in \"trophy\"",
+      "advice": "In the trophy position the racket should drop behind your back — that's what gives the hit its acceleration. Try relaxing the wrist and letting the racket drop."
+    },
+    "T2": {
+      "title": "Trophy pause",
+      "metricName": "Time from \"trophy\" to contact",
+      "advice": "A pause in the trophy position drains energy. Try to transition smoothly from the toss to the hit without stopping."
+    },
+    "F1": {
+      "title": "Follow-through",
+      "metricName": "Racket travel across the body after contact",
+      "advice": "The racket motion cuts off after the hit. Finish the serve — let the racket travel across the body to the opposite side. It's both power and shoulder protection."
+    },
+    "F2": {
+      "title": "Balance",
+      "metricName": "Body lean at the end of the serve",
+      "advice": "The body leans noticeably at the end of the serve. This is often just a step into the court, but if it happens a lot, work on finishing balanced."
     }
   },
   "lang": {

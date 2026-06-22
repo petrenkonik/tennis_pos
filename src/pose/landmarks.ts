@@ -9,6 +9,7 @@ export const LM = {
   L_HIP: 23, R_HIP: 24,
   L_KNEE: 25, R_KNEE: 26,
   L_ANKLE: 27, R_ANKLE: 28,
+  L_HEEL: 29, R_HEEL: 30,
 } as const;
 
 // Right-handed player: racket = right arm. Left-handed: racket = left arm.
