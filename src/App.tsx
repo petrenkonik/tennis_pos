@@ -512,7 +512,7 @@ export default function App() {
               ballTrack={result.ballTrack}
               racketTrack={result.racketTrack}
               poses={result.poses}
-              handedness={handedness}
+              handedness={result.phases.handedness}
             />
           )}
           </div>
