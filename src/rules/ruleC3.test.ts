@@ -13,7 +13,21 @@ function makeCtx(kneeFlexionAtTrophyDeg: number, confidence: Confidence = 'high'
       phases: { preparation: [0, 0], trophy: [0, 1], acceleration: [1, 1], followThrough: [1, 2] },
       confidence,
     },
-    metrics: { kneeFlexionAtTrophyDeg },
+    metrics: {
+      kneeFlexionAtTrophyDeg,
+      elbowExtensionAtContactDeg: 170,
+      contactHeightAboveShoulder: 0.1,
+      contactHorizontalOffset: 0,
+      tossApexFrame: 0,
+      tossApexHeightAboveShoulder: 0.2,
+      tossApexHorizontalOffset: 0,
+      tossArmDropAtContact: 0.9,
+      racketDropDepth: 0.05,
+      accelerationPhaseMs: 100,
+      followThroughHorizontalTravel: 0.2,
+      leanAtFollowEnd: 0.05,
+      facingSign: 1,
+    },
   };
 }
 
@@ -44,6 +58,10 @@ describe('ruleC3 (insufficient knee bend)', () => {
     expect(f.advice).toBe('rules.C3.advice');
     const adviceText = i18n.t(f.advice);
     expect(adviceText).not.toMatch(/rotation|pronation|anatom/i);
+  });
+  it('graduates the advice wording by severity (warn → adviceMild, error → advice)', () => {
+    expect(ruleC3.check(makeCtx(165))?.advice).toBe('rules.C3.adviceMild');
+    expect(ruleC3.check(makeCtx(175))?.advice).toBe('rules.C3.advice');
   });
 
   describe('evaluate (full report row)', () => {

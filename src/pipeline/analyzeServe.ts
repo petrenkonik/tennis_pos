@@ -4,7 +4,7 @@ import { smooth } from './smooth';
 import { detectPhases, ServeNotRecognizedError, type ServeRejectDetail } from './detectPhases';
 import { buildPhaseContext } from './buildPhaseContext';
 import { runRules, runRulesReport } from './runRules';
-import { ruleC3 } from '../rules/ruleC3';
+import { ALL_RULES } from '../rules';
 import { extractPoses, type PoseModel } from './extractPoses';
 import { MAX_CLIP_SECONDS } from '../constants/biomechanics';
 
@@ -75,8 +75,8 @@ export async function analyzeServe(
       maxLowVisFraction: options.maxLowVisFraction,
     });
     const ctx = buildPhaseContext(smoothed, raw.fps, phases);
-    const findings = runRules(ctx, [ruleC3]);
-    const ruleResults = runRulesReport(ctx, [ruleC3]);
+    const findings = runRules(ctx, ALL_RULES);
+    const ruleResults = runRulesReport(ctx, ALL_RULES);
     return { ok: true, phases, findings, ruleResults, poses: smoothed };
   } catch (e) {
     if (e instanceof ServeNotRecognizedError) {

@@ -4,6 +4,7 @@ import { CheckCircle2, AlertTriangle, XCircle, HelpCircle } from 'lucide-react';
 import type { RuleResult, RuleStatus } from '../rules/types';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
 import { Badge, type BadgeProps } from '@/components/ui/badge';
+import { compareRuleMetric } from '../lib/normComparison';
 
 const STATUS_ICON = {
   ok: CheckCircle2,
@@ -49,6 +50,10 @@ export function RuleCard({
   const { t } = useTranslation();
   const StatusIcon = STATUS_ICON[rule.status];
   const ms = rule.atTimestampMs;
+  // Human-readable "Yours: X — below/above the norm (Y)" line. Null when the
+  // metric has no reference range (e.g. unknown status, or a metric that is
+  // intrinsically directional). Direction is also used to tint the line.
+  const comparison = rule.metric ? compareRuleMetric(rule.metric) : null;
 
   // The whole card seeks + selects. Only rules with a timestamp are navigable.
   const seekable = ms !== undefined && (onSelect !== undefined || onSeek !== undefined);
@@ -121,10 +126,27 @@ export function RuleCard({
               <span className="text-sm text-muted-foreground">{rule.metric.unit}</span>
             </div>
             <p className="text-xs text-muted-foreground">{t(rule.metric.name)}</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {t('report.colNorm')}: {formatRange(rule.metric.referenceRange, rule.metric.unit)}
-            </p>
+            {comparison ? (
+              <p className="mt-1 text-xs font-medium text-foreground/80">
+                {t(comparison.labelKey, {
+                  value: comparison.params.value,
+                  direction: t(comparison.params.direction),
+                  norm: comparison.params.norm,
+                })}
+              </p>
+            ) : (
+              <p className="mt-1 text-xs text-muted-foreground">
+                {t('report.colNorm')}: {formatRange(rule.metric.referenceRange, rule.metric.unit)}
+              </p>
+            )}
           </div>
+        )}
+        {/* The advice (what's wrong + why it matters + how to fix). Only for
+            problem rows; an ok/unknown card has nothing to fix. */}
+        {rule.advice && (rule.status === 'warn' || rule.status === 'error') && (
+          <p className="text-sm leading-snug text-card-foreground/90">
+            {t(rule.advice)}
+          </p>
         )}
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <span>{t('report.colPhase')}:</span>

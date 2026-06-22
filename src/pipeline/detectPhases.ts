@@ -1,6 +1,6 @@
 import type { PoseFrame, Phases, Handedness, Confidence } from '../types';
 import { LM, racketWrist, racketShoulder } from '../pose/landmarks';
-import { kneeFlexion, elbowExtension, racketWristHeight } from '../pose/metrics';
+import { kneeJointAngle, elbowExtension, racketWristHeight, tossWristHeight } from '../pose/metrics';
 import { localMaxima } from '../pose/geometry';
 import {
   CONTACT_ELBOW_MIN_DEG, CONTACT_HEIGHT_PROMINENCE, VISIBILITY_THRESHOLD,
@@ -86,6 +86,58 @@ function timeBasedFallback(poses: PoseFrame[], h: Handedness): Phases {
   return assemble(h, trophyFrame, contactFrame, contactFrame, last, 'low');
 }
 
+// Contact = global highest racket-wrist peak with an extended elbow. Detected
+// independently of trophy on purpose: the old "highest peak AFTER trophy" coupling
+// let a misdetected (late) trophy suppress contact entirely (contactFrame === -1).
+function detectContact(poses: PoseFrame[], h: Handedness): { frame: number; confident: boolean } {
+  const last = poses.length - 1;
+  const heights = poses.map(p => racketWristHeight(p, h));
+  const peaks = localMaxima(heights, CONTACT_HEIGHT_PROMINENCE);
+  let frame = -1, best = -Infinity;
+  for (const i of peaks) {
+    if (elbowExtension(poses[i], h) >= CONTACT_ELBOW_MIN_DEG && heights[i] > best) {
+      best = heights[i]; frame = i;
+    }
+  }
+  if (frame >= 0) return { frame, confident: true };
+  // No clean extended-elbow peak: best-effort global max height, low confidence.
+  for (let i = 0; i <= last; i++) if (heights[i] > best) { best = heights[i]; frame = i; }
+  return { frame, confident: false };
+}
+
+// Trophy = the overhead frame nearest the toss-arm's vertical peak within
+// [0, searchEnd). The toss arm reaches full extension at the trophy POSE (racket
+// behind the head); the deepest knee bend comes a few frames LATER, during the
+// racket drop / leg load, so anchoring on the toss peak (not the knee minimum)
+// keeps trophy on the pose itself. Knee depth is only a tie-break between frames
+// equidistant from the peak. Returns frame -1 when no frame is overhead (trophy
+// "not expressed") so the caller can use the time-based fallback.
+function detectTrophy(
+  poses: PoseFrame[], h: Handedness, searchEnd: number,
+): { frame: number; confident: boolean } {
+  const end = Math.min(searchEnd, poses.length);
+  if (end <= 0) return { frame: -1, confident: false };
+
+  let tossPeakFrame = 0, tossPeakH = -Infinity;
+  for (let i = 0; i < end; i++) {
+    const th = tossWristHeight(poses[i], h);
+    if (th > tossPeakH) { tossPeakH = th; tossPeakFrame = i; }
+  }
+
+  let frame = -1, bestDist = Infinity, bestKnee = Infinity;
+  for (let i = 0; i < end; i++) {
+    const overhead = racketWrist(poses[i], h).y < poses[i].landmarks[TROPHY_OVERHEAD_REF_LM].y;
+    if (!overhead) continue;
+    const dist = Math.abs(i - tossPeakFrame);
+    const knee = kneeJointAngle(poses[i]);
+    const kneeVal = Number.isNaN(knee) ? Infinity : knee;
+    if (dist < bestDist || (dist === bestDist && kneeVal < bestKnee)) {
+      bestDist = dist; bestKnee = kneeVal; frame = i;
+    }
+  }
+  return frame >= 0 ? { frame, confident: true } : { frame: -1, confident: false };
+}
+
 export function detectPhases(
   poses: PoseFrame[], h: Handedness, gate: GateOptions = {},
 ): Phases {
@@ -120,43 +172,28 @@ export function detectPhases(
 
   const last = poses.length - 1;
 
-  // 2) trophy = min knee flexion among "racket overhead" frames
-  let trophyFrame = -1, minAngle = Infinity;
-  for (let i = 0; i <= last; i++) {
-    const overhead = racketWrist(poses[i], h).y < poses[i].landmarks[TROPHY_OVERHEAD_REF_LM].y;
-    if (!overhead) continue;
-    const ang = kneeFlexion(poses[i]);
-    if (ang < minAngle) { minAngle = ang; trophyFrame = i; }
-  }
-  if (trophyFrame < 0) return timeBasedFallback(poses, h);
+  // 2) contact first (trophy-independent), then trophy bounded before it.
+  const contact = detectContact(poses, h);
+  // Bound the trophy search by contact even when contact is low-confidence: the
+  // best-effort global-max contact frame is still a better ceiling than the whole
+  // clip, which could otherwise anchor trophy on a post-contact toss motion and
+  // force a degenerate (clamped) phase split.
+  const searchEnd = contact.frame;
+  const trophy = detectTrophy(poses, h, searchEnd);
+  if (trophy.frame < 0) return timeBasedFallback(poses, h);
 
-  let confidence: Confidence = 'high';
+  let trophyFrame = trophy.frame;
+  let contactFrame = contact.frame;
+  let confidence: Confidence = contact.confident && trophy.confident ? 'high' : 'low';
 
-  // 3) contact = highest qualifying racket-wrist peak after trophy
-  const heights = poses.map(p => racketWristHeight(p, h));
-  const peaks = localMaxima(heights, CONTACT_HEIGHT_PROMINENCE).filter(i => i > trophyFrame);
-  let contactFrame = -1, best = -Infinity;
-  for (const i of peaks) {
-    if (elbowExtension(poses[i], h) >= CONTACT_ELBOW_MIN_DEG && heights[i] > best) {
-      best = heights[i]; contactFrame = i;
-    }
-  }
-  if (contactFrame < 0) {
-    confidence = 'low'; // no clean peak: take global max height after trophy
-    for (let i = trophyFrame + 1; i <= last; i++) {
-      if (heights[i] > best) { best = heights[i]; contactFrame = i; }
-    }
-    if (contactFrame < 0) contactFrame = Math.min(trophyFrame + 1, last);
-  }
-
-  // 4) follow-through start = first post-contact frame with wrist below shoulder
+  // 3) follow-through start = first post-contact frame with wrist below shoulder
   let followStartFrame = -1;
   for (let i = contactFrame + 1; i <= last; i++) {
     if (racketWrist(poses[i], h).y > racketShoulder(poses[i], h).y) { followStartFrame = i; break; }
   }
   if (followStartFrame < 0) { followStartFrame = last; confidence = 'low'; }
 
-  // 5) invariant guard: trophy < contact < followStart, each pair at least 1 apart.
+  // 4) invariant guard: trophy < contact < followStart, each pair at least 1 apart.
   // Order alone is not enough — without the +1 floor the contact/trophy frames
   // can collapse onto each other and produce degenerate [n, n] phase intervals.
   const clampMinWidths = (): void => {

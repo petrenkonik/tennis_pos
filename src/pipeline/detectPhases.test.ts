@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { detectPhases, ServeNotRecognizedError, visibilityBreakdown } from './detectPhases';
-import { buildHappyServe, makeFrame, makeLandmarks } from '../__tests__/fixtures/poses';
+import { buildHappyServe, buildLandingCrouchServe, buildTossGateServe, buildKneeAfterTrophyServe, buildNoConfidentContactServe, makeFrame, makeLandmarks } from '../__tests__/fixtures/poses';
 import { LM } from '../pose/landmarks';
 
 describe('detectPhases', () => {
@@ -84,5 +84,52 @@ describe('detectPhases', () => {
     // Phases as intervals must not collapse to [n, n] either.
     expect(r.phases.trophy[1]).toBeGreaterThan(r.phases.trophy[0]);
     expect(r.phases.acceleration[0]).toBeLessThan(r.phases.acceleration[1]);
+  });
+
+  it('picks the pre-contact trophy even when the deepest knee bend is after contact', () => {
+    // Regression for the demo clip: deepest knee bend is the landing crouch (f5-f6),
+    // which the old "deepest knee among overhead frames" rule wrongly chose.
+    const r = detectPhases(buildLandingCrouchServe(), 'right');
+    expect(r.events.trophyFrame).toBe(2);
+    expect(r.events.contactFrame).toBe(4);
+    expect(r.events.followStartFrame).toBe(6);
+    expect(r.confidence).toBe('high');
+  });
+
+  it('detects contact independently of a bad trophy region (no -1 fallback)', () => {
+    // Same fixture: even though the global knee minimum is post-contact, contact
+    // is still found at the racket-height peak — it does not depend on trophy.
+    const r = detectPhases(buildLandingCrouchServe(), 'right');
+    expect(r.events.contactFrame).toBe(4);
+    expect(r.events.trophyFrame).toBeLessThan(r.events.contactFrame);
+  });
+
+  it('rejects an overhead frame with the toss arm down in favour of the real trophy', () => {
+    // f1 is overhead with a deeper knee but the toss arm is down; the gate must
+    // pick f2 (toss arm extended up), even though f1 is more bent.
+    const r = detectPhases(buildTossGateServe(), 'right');
+    expect(r.events.trophyFrame).toBe(2);
+    expect(r.events.contactFrame).toBe(4);
+    expect(r.confidence).toBe('high');
+  });
+
+  it('anchors trophy on the toss-arm peak, not the deepest knee in the window', () => {
+    // f2 is the toss-arm peak (trophy pose); f4 is overhead with a deeper knee
+    // (racket-drop load). Trophy must be f2, proving the anchor is the toss peak.
+    const r = detectPhases(buildKneeAfterTrophyServe(), 'right');
+    expect(r.events.trophyFrame).toBe(2);
+    expect(r.events.contactFrame).toBe(5);
+    expect(r.confidence).toBe('high');
+  });
+
+  it('flags low confidence when no height peak has an extended elbow (degraded contact)', () => {
+    const r = detectPhases(buildNoConfidentContactServe(), 'right');
+    expect(r.confidence).toBe('low');                         // contact not confident
+    expect(r.events.contactFrame).toBe(4);                    // global-max height fallback
+    expect(r.events.trophyFrame).toBe(2);                     // still bounded before contact
+    expect(r.events.trophyFrame).toBeLessThan(r.events.contactFrame);
+    expect(r.events.contactFrame).toBeLessThan(r.events.followStartFrame);
+    // phases must not collapse to a degenerate [n, n] interval
+    expect(r.phases.acceleration[1]).toBeGreaterThan(r.phases.acceleration[0]);
   });
 });
