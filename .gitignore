@@ -32,3 +32,4 @@ npm-debug.log*
 
 # Git worktrees (local isolated workspaces)
 .worktrees/
+.sdd/
