@@ -52,3 +52,31 @@ export interface PhaseContext {
     facingSign: 1 | -1 | 0;
   };
 }
+
+// ---- Ball / racket detection layer (see specs/2026-06-22-detection-layer) ----
+export interface BoxNorm { x: number; y: number; w: number; h: number; } // normalized [0,1], origin top-left
+
+export interface Detection { box: BoxNorm; score: number; }
+
+export interface DetectionFrame {
+  frameIndex: number;
+  timestampMs: number;
+  ball: Detection | null;   // best ball this frame, else null
+  racket: Detection | null; // best racket this frame, else null
+}
+
+export interface TrackPoint {
+  frameIndex: number;
+  timestampMs: number;
+  center: { x: number; y: number };
+  box: BoxNorm;
+  score: number;
+  interpolated: boolean; // true = gap-filled, not a real detection
+}
+
+export interface ObjectTrack {
+  points: (TrackPoint | null)[]; // one slot per input DetectionFrame; null = uncovered
+  coverage: number;              // real (non-interpolated) detections / total frames
+}
+export type BallTrack = ObjectTrack;
+export type RacketTrack = ObjectTrack;
