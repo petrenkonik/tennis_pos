@@ -37,6 +37,9 @@
     "preview": "skeleton preview",
     "errorHint": "The skeleton is overlaid on the video (preview). Scrub the video to inspect detection: red dots mark joints where MediaPipe is unsure."
   },
+  "detection": {
+    "toggle": "Show ball & racket"
+  },
   "errors": {
     "video-too-long": "Video is longer than 30 seconds. Upload a short clip of a single serve.",
     "serve-not-recognized": "Could not recognize the serve. Shoot from the side, with the player fully in frame.",
