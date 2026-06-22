@@ -1,12 +1,11 @@
 import type { ErrorRule, Finding, RuleResult } from './types';
+import { adviceKey } from './advice';
 import {
   CONTACT_HORIZONTAL_BEHIND_WARN, CONTACT_HORIZONTAL_BEHIND_ERROR,
 } from '../constants/biomechanics';
 import { LM } from '../pose/landmarks';
 
-// i18n keys (resolved by AdviceList / RulesReport via t()).
 const TITLE_KEY = 'rules.C2.title';
-const ADVICE_KEY = 'rules.C2.advice';
 const METRIC_NAME_KEY = 'rules.C2.metricName';
 
 // Reference range shown in the Layer-2 report: |offset| up to WARN is "in line
@@ -39,7 +38,7 @@ function evaluateC2(ctx: Parameters<NonNullable<ErrorRule['evaluate']>>[0]): Rul
   if (projected >= -CONTACT_HORIZONTAL_BEHIND_WARN) return { ...base, status: 'ok', metric };
   // projected < -WARN → behind. Lower (more negative) → error.
   const status = projected < -CONTACT_HORIZONTAL_BEHIND_ERROR ? 'error' : 'warn';
-  return { ...base, status, advice: ADVICE_KEY, metric };
+  return { ...base, status, advice: adviceKey('C2', status), metric };
 }
 
 export const ruleC2: ErrorRule = {

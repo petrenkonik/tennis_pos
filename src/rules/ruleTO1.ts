@@ -1,11 +1,11 @@
 import type { ErrorRule, Finding, RuleResult } from './types';
+import { adviceKey } from './advice';
 import {
   TOSS_APEX_HORIZONTAL_BEHIND_WARN, TOSS_APEX_HORIZONTAL_BEHIND_ERROR,
 } from '../constants/biomechanics';
 import { LM } from '../pose/landmarks';
 
 const TITLE_KEY = 'rules.TO1.title';
-const ADVICE_KEY = 'rules.TO1.advice';
 const METRIC_NAME_KEY = 'rules.TO1.metricName';
 
 const REFERENCE_RANGE: [number, number] = [-TOSS_APEX_HORIZONTAL_BEHIND_WARN, TOSS_APEX_HORIZONTAL_BEHIND_WARN];
@@ -32,7 +32,7 @@ function evaluateTO1(ctx: Parameters<NonNullable<ErrorRule['evaluate']>>[0]): Ru
   };
   if (projected >= -TOSS_APEX_HORIZONTAL_BEHIND_WARN) return { ...base, status: 'ok', metric };
   const status = projected < -TOSS_APEX_HORIZONTAL_BEHIND_ERROR ? 'error' : 'warn';
-  return { ...base, status, advice: ADVICE_KEY, metric };
+  return { ...base, status, advice: adviceKey('TO1', status), metric };
 }
 
 export const ruleTO1: ErrorRule = {

@@ -59,6 +59,10 @@ describe('ruleC3 (insufficient knee bend)', () => {
     const adviceText = i18n.t(f.advice);
     expect(adviceText).not.toMatch(/rotation|pronation|anatom/i);
   });
+  it('graduates the advice wording by severity (warn → adviceMild, error → advice)', () => {
+    expect(ruleC3.check(makeCtx(165))?.advice).toBe('rules.C3.adviceMild');
+    expect(ruleC3.check(makeCtx(175))?.advice).toBe('rules.C3.advice');
+  });
 
   describe('evaluate (full report row)', () => {
     it('reports ok with the metric when bend is sufficient', () => {

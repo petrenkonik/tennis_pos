@@ -1,12 +1,11 @@
 import type { ErrorRule, Finding, RuleResult } from './types';
+import { adviceKey } from './advice';
 import {
   CONTACT_HEIGHT_ABOVE_SHOULDER_WARN, CONTACT_HEIGHT_ABOVE_SHOULDER_ERROR,
 } from '../constants/biomechanics';
 import { LM } from '../pose/landmarks';
 
-// i18n keys (resolved by AdviceList / RulesReport via t()).
 const TITLE_KEY = 'rules.C1.title';
-const ADVICE_KEY = 'rules.C1.advice';
 const METRIC_NAME_KEY = 'rules.C1.metricName';
 
 // Reference range shown in the Layer-2 report. The "good" zone starts at WARN;
@@ -35,7 +34,7 @@ function evaluateC1(ctx: Parameters<NonNullable<ErrorRule['evaluate']>>[0]): Rul
   // Larger height = better contact. Below ERROR → error; [ERROR, WARN) → warn.
   if (h >= CONTACT_HEIGHT_ABOVE_SHOULDER_WARN) return { ...base, status: 'ok', metric };
   const status = h < CONTACT_HEIGHT_ABOVE_SHOULDER_ERROR ? 'error' : 'warn';
-  return { ...base, status, advice: ADVICE_KEY, metric };
+  return { ...base, status, advice: adviceKey('C1', status), metric };
 }
 
 export const ruleC1: ErrorRule = {

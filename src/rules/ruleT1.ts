@@ -1,9 +1,9 @@
 import type { ErrorRule, Finding, RuleResult } from './types';
+import { adviceKey } from './advice';
 import { RACKET_DROP_DEPTH_WARN, RACKET_DROP_DEPTH_ERROR } from '../constants/biomechanics';
 import { LM } from '../pose/landmarks';
 
 const TITLE_KEY = 'rules.T1.title';
-const ADVICE_KEY = 'rules.T1.advice';
 const METRIC_NAME_KEY = 'rules.T1.metricName';
 
 // Normative range: a good racket drop has the wrist below the elbow by at least
@@ -30,7 +30,7 @@ function evaluateT1(ctx: Parameters<NonNullable<ErrorRule['evaluate']>>[0]): Rul
   // Larger depth = better drop. At/below ERROR → no drop → error.
   if (depth >= RACKET_DROP_DEPTH_WARN) return { ...base, status: 'ok', metric };
   const status = depth <= RACKET_DROP_DEPTH_ERROR ? 'error' : 'warn';
-  return { ...base, status, advice: ADVICE_KEY, metric };
+  return { ...base, status, advice: adviceKey('T1', status), metric };
 }
 
 export const ruleT1: ErrorRule = {

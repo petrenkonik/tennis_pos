@@ -58,6 +58,10 @@ describe('ruleTO2 (toss too low)', () => {
     expect(f.advice).toBe('rules.TO2.advice');
     expect(i18n.t(f.advice)).not.toMatch(/rotation|pronation|anatom|flexion|extension/i);
   });
+  it('graduates the advice wording by severity (warn → adviceMild, error → advice)', () => {
+    expect(ruleTO2.check(makeCtx(0.12))?.advice).toBe('rules.TO2.adviceMild');
+    expect(ruleTO2.check(makeCtx(0.04))?.advice).toBe('rules.TO2.advice');
+  });
 
   describe('evaluate (full report row)', () => {
     it('reports ok with the metric when the toss is high enough', () => {

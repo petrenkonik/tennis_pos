@@ -1,11 +1,10 @@
 import type { ErrorRule, Finding, RuleResult } from './types';
+import { adviceKey } from './advice';
 import { KNEE_JOINT_ANGLE_NORMAL_RANGE_DEG, KNEE_JOINT_ANGLE_ERROR_MARGIN_DEG } from '../constants/biomechanics';
 import { LM } from '../pose/landmarks';
 
-// i18n keys (resolved by AdviceList / RulesReport via t()). The rule itself is
-// locale-agnostic: it never carries display strings, only keys + numbers.
+// i18n keys (resolved by AdviceList / RulesReport via t()).
 const TITLE_KEY = 'rules.C3.title';
-const ADVICE_KEY = 'rules.C3.advice';
 const METRIC_NAME_KEY = 'rules.C3.metricName';
 
 // Single source of truth: always returns a full row (ok/warn/error/unknown).
@@ -39,7 +38,7 @@ function evaluateC3(ctx: Parameters<NonNullable<ErrorRule['evaluate']>>[0]): Rul
   // angle grows as bend shrinks (180° = straight); too straight => angle > max.
   if (angle <= max) return { ...base, status: 'ok', metric };
   const status = angle > max + KNEE_JOINT_ANGLE_ERROR_MARGIN_DEG ? 'error' : 'warn';
-  return { ...base, status, advice: ADVICE_KEY, metric };
+  return { ...base, status, advice: adviceKey('C3', status), metric };
 }
 
 export const ruleC3: ErrorRule = {

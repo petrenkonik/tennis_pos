@@ -66,6 +66,10 @@ describe('ruleTO1 (toss too far back)', () => {
     expect(f.advice).toBe('rules.TO1.advice');
     expect(i18n.t(f.advice)).not.toMatch(/rotation|pronation|anatom|flexion|extension/i);
   });
+  it('graduates the advice wording by severity (warn → adviceMild, error → advice)', () => {
+    expect(ruleTO1.check(makeCtx(-0.04, 1))?.advice).toBe('rules.TO1.adviceMild');
+    expect(ruleTO1.check(makeCtx(-0.08, 1))?.advice).toBe('rules.TO1.advice');
+  });
 
   describe('evaluate (full report row)', () => {
     it('reports ok when in front', () => {

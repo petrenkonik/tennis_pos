@@ -1,11 +1,11 @@
 import type { ErrorRule, Finding, RuleResult } from './types';
+import { adviceKey } from './advice';
 import {
   TOSS_APEX_HEIGHT_ABOVE_SHOULDER_WARN, TOSS_APEX_HEIGHT_ABOVE_SHOULDER_ERROR,
 } from '../constants/biomechanics';
 import { LM } from '../pose/landmarks';
 
 const TITLE_KEY = 'rules.TO2.title';
-const ADVICE_KEY = 'rules.TO2.advice';
 const METRIC_NAME_KEY = 'rules.TO2.metricName';
 
 // Normative range: a good amateur toss peaks at or above WARN. Below it the toss
@@ -31,7 +31,7 @@ function evaluateTO2(ctx: Parameters<NonNullable<ErrorRule['evaluate']>>[0]): Ru
   };
   if (h >= TOSS_APEX_HEIGHT_ABOVE_SHOULDER_WARN) return { ...base, status: 'ok', metric };
   const status = h < TOSS_APEX_HEIGHT_ABOVE_SHOULDER_ERROR ? 'error' : 'warn';
-  return { ...base, status, advice: ADVICE_KEY, metric };
+  return { ...base, status, advice: adviceKey('TO2', status), metric };
 }
 
 export const ruleTO2: ErrorRule = {

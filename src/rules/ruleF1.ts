@@ -1,9 +1,9 @@
 import type { ErrorRule, Finding, RuleResult } from './types';
+import { adviceKey } from './advice';
 import { FOLLOW_THROUGH_TRAVEL_WARN, FOLLOW_THROUGH_TRAVEL_ERROR } from '../constants/biomechanics';
 import { LM } from '../pose/landmarks';
 
 const TITLE_KEY = 'rules.F1.title';
-const ADVICE_KEY = 'rules.F1.advice';
 const METRIC_NAME_KEY = 'rules.F1.metricName';
 
 // Normative range: a finished serve swings the racket across the body by at
@@ -29,7 +29,7 @@ function evaluateF1(ctx: Parameters<NonNullable<ErrorRule['evaluate']>>[0]): Rul
   };
   if (travel >= FOLLOW_THROUGH_TRAVEL_WARN) return { ...base, status: 'ok', metric };
   const status = travel < FOLLOW_THROUGH_TRAVEL_ERROR ? 'error' : 'warn';
-  return { ...base, status, advice: ADVICE_KEY, metric };
+  return { ...base, status, advice: adviceKey('F1', status), metric };
 }
 
 export const ruleF1: ErrorRule = {

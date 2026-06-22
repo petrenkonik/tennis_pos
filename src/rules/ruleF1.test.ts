@@ -58,6 +58,10 @@ describe('ruleF1 (abrupt stop)', () => {
     expect(f.advice).toBe('rules.F1.advice');
     expect(i18n.t(f.advice)).not.toMatch(/rotation|pronation|anatom|flexion|extension/i);
   });
+  it('graduates the advice wording by severity (warn → adviceMild, error → advice)', () => {
+    expect(ruleF1.check(makeCtx(0.10))?.advice).toBe('rules.F1.adviceMild');
+    expect(ruleF1.check(makeCtx(0.03))?.advice).toBe('rules.F1.advice');
+  });
 
   describe('evaluate (full report row)', () => {
     it('reports ok with the metric when the travel is long enough', () => {

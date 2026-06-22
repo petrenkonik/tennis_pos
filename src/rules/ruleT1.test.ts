@@ -61,6 +61,10 @@ describe('ruleT1 (no racket drop)', () => {
     expect(f.advice).toBe('rules.T1.advice');
     expect(i18n.t(f.advice)).not.toMatch(/rotation|pronation|anatom|flexion|extension/i);
   });
+  it('graduates the advice wording by severity (warn → adviceMild, error → advice)', () => {
+    expect(ruleT1.check(makeCtx(0.015))?.advice).toBe('rules.T1.adviceMild');
+    expect(ruleT1.check(makeCtx(-0.02))?.advice).toBe('rules.T1.advice');
+  });
 
   describe('evaluate (full report row)', () => {
     it('reports ok with the metric when the drop is deep', () => {

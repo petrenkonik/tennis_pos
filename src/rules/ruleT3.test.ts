@@ -58,6 +58,10 @@ describe('ruleT3 (toss arm drops too early)', () => {
     expect(f.advice).toBe('rules.T3.advice');
     expect(i18n.t(f.advice)).not.toMatch(/rotation|pronation|anatom|flexion|extension/i);
   });
+  it('graduates the advice wording by severity (warn → adviceMild, error → advice)', () => {
+    expect(ruleT3.check(makeCtx(0.80))?.advice).toBe('rules.T3.adviceMild');
+    expect(ruleT3.check(makeCtx(0.50))?.advice).toBe('rules.T3.advice');
+  });
 
   describe('evaluate (full report row)', () => {
     it('reports ok with the metric when the arm is still high', () => {

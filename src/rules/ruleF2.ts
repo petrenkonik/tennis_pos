@@ -3,8 +3,10 @@ import { LEAN_AT_FOLLOW_END_INFO } from '../constants/biomechanics';
 import { LM } from '../pose/landmarks';
 
 const TITLE_KEY = 'rules.F2.title';
-const ADVICE_KEY = 'rules.F2.advice';
 const METRIC_NAME_KEY = 'rules.F2.metricName';
+// F2 is info-only by design (see evaluateF2 note): a single hedged advice text,
+// not graduated by severity — CV can't tell lean from a natural step.
+const ADVICE_KEY = 'rules.F2.advice';
 
 // Normative range: balanced means |hip − foot| x-offset up to INFO at the end
 // of the serve. Above INFO we surface a soft note.

@@ -58,6 +58,10 @@ describe('ruleT2 (too long in trophy — weak proxy, warn-only)', () => {
     expect(f.advice).toBe('rules.T2.advice');
     expect(i18n.t(f.advice)).not.toMatch(/rotation|pronation|anatom|flexion|extension/i);
   });
+  it('graduates the advice wording by severity (warn → adviceMild, error → advice)', () => {
+    expect(ruleT2.check(makeCtx(500))?.advice).toBe('rules.T2.adviceMild');
+    expect(ruleT2.check(makeCtx(800))?.advice).toBe('rules.T2.advice');
+  });
 
   describe('evaluate (full report row)', () => {
     it('reports ok with the metric when fluent', () => {

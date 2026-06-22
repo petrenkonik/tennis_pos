@@ -61,6 +61,12 @@ describe('ruleC1 (contact too low)', () => {
     expect(f.advice).toBe('rules.C1.advice');
     expect(i18n.t(f.advice)).not.toMatch(/rotation|pronation|anatom|flexion|extension/i);
   });
+  it('graduates the advice wording by severity (warn → adviceMild, error → advice)', () => {
+    // warn (just below the boundary) uses the softer "adviceMild" copy.
+    expect(ruleC1.check(makeCtx(0.035))?.advice).toBe('rules.C1.adviceMild');
+    // error (far off) uses the full "advice" copy.
+    expect(ruleC1.check(makeCtx(0.005))?.advice).toBe('rules.C1.advice');
+  });
 
   describe('evaluate (full report row)', () => {
     it('reports ok with the metric when the contact is high enough', () => {

@@ -1,9 +1,9 @@
 import type { ErrorRule, Finding, RuleResult } from './types';
+import { adviceKey } from './advice';
 import { ACCELERATION_PHASE_MS_WARN, ACCELERATION_PHASE_MS_ERROR } from '../constants/biomechanics';
 import { LM } from '../pose/landmarks';
 
 const TITLE_KEY = 'rules.T2.title';
-const ADVICE_KEY = 'rules.T2.advice';
 const METRIC_NAME_KEY = 'rules.T2.metricName';
 
 // Normative range: a fluent acceleration takes at most WARN ms. The lower bound
@@ -36,7 +36,7 @@ function evaluateT2(ctx: Parameters<NonNullable<ErrorRule['evaluate']>>[0]): Rul
   };
   if (ms <= ACCELERATION_PHASE_MS_WARN) return { ...base, status: 'ok', metric };
   const status = ms > ACCELERATION_PHASE_MS_ERROR ? 'error' : 'warn';
-  return { ...base, status, advice: ADVICE_KEY, metric };
+  return { ...base, status, advice: adviceKey('T2', status), metric };
 }
 
 export const ruleT2: ErrorRule = {

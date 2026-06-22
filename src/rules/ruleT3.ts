@@ -1,9 +1,9 @@
 import type { ErrorRule, Finding, RuleResult } from './types';
+import { adviceKey } from './advice';
 import { TOSS_ARM_DROP_AT_CONTACT_WARN, TOSS_ARM_DROP_AT_CONTACT_ERROR } from '../constants/biomechanics';
 import { LM } from '../pose/landmarks';
 
 const TITLE_KEY = 'rules.T3.title';
-const ADVICE_KEY = 'rules.T3.advice';
 const METRIC_NAME_KEY = 'rules.T3.metricName';
 
 // Normative ratio: the toss arm should still be near its peak height at contact.
@@ -29,7 +29,7 @@ function evaluateT3(ctx: Parameters<NonNullable<ErrorRule['evaluate']>>[0]): Rul
   };
   if (ratio >= TOSS_ARM_DROP_AT_CONTACT_WARN) return { ...base, status: 'ok', metric };
   const status = ratio < TOSS_ARM_DROP_AT_CONTACT_ERROR ? 'error' : 'warn';
-  return { ...base, status, advice: ADVICE_KEY, metric };
+  return { ...base, status, advice: adviceKey('T3', status), metric };
 }
 
 export const ruleT3: ErrorRule = {
