@@ -22,6 +22,8 @@ function buildTrack(frames: DetectionFrame[], pick: (f: DetectionFrame) => Detec
     const d = pick(frames[i]);
     if (!d || d.score < TRACK_SCORE_MIN) continue;
     const c = centerOf(d.box);
+    // Follow-up (sub-project B, time-aware gating): this ignores gap length, so
+    // a fast object spanning a dropped frame can be wrongly rejected here.
     if (lastCenter && dist(c, lastCenter) > TRACK_GATING_MAX_DIST) continue; // spurious far box
     pts[i] = {
       frameIndex: frames[i].frameIndex, timestampMs: frames[i].timestampMs,

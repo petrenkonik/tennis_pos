@@ -25,9 +25,8 @@ export function pickDetections(
   for (const d of raw) {
     const bb = d.boundingBox;
     if (!bb) continue;
-    const det: Detection = {
+    const det: Pick<Detection, 'box'> = {
       box: { x: bb.originX / videoW, y: bb.originY / videoH, w: bb.width / videoW, h: bb.height / videoH },
-      score: d.categories[0]?.score ?? 0,
     };
     for (const c of d.categories) {
       const cand: Detection = { ...det, score: c.score };
@@ -40,8 +39,8 @@ export function pickDetections(
 
 // Combined extractor: one shared frame walk, both models per frame. poses and
 // detections are appended together only on kept (33-landmark) frames, so the
-// arrays stay index- and timestamp-aligned. Impure boundary; validated on the
-// demo clip via DetectionOverlay.
+// arrays stay index- and timestamp-aligned. Impure boundary; intended to be
+// validated on the demo clip via DetectionOverlay.
 export async function extractFrameData(
   video: HTMLVideoElement,
   onProgress?: (frac: number) => void,

@@ -40,7 +40,7 @@ export interface AnalyzeOptions {
   visibilityThreshold?: number;
   maxLowVisFraction?: number;
   // Test seam: inject a synthetic extract to bypass MediaPipe. Defaults to the
-  // real extractPoses. Kept inside options (not a 5th positional arg) so callers
+  // real extractFrameData. Kept inside options (not a 5th positional arg) so callers
   // never have to pass `undefined` for it in production code.
   deps?: AnalyzeDeps;
 }

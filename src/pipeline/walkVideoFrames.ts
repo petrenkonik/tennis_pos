@@ -10,7 +10,8 @@ export function frameSampleTimes(durationSec: number, stepSec: number): number[]
 }
 
 // Seek-and-wait per sample time, invoking onFrame once the frame is ready.
-// Impure boundary (drives the <video> element); validated via the demo overlay.
+// Impure boundary (drives the <video> element); intended to be validated via
+// the demo overlay.
 const SEEK_TIMEOUT_MS = 5000;
 export async function walkVideoFrames(
   video: HTMLVideoElement,
