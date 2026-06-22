@@ -41,6 +41,8 @@ const successResult: AnalysisResult = {
   findings: [],
   ruleResults: [],
   poses: buildHappyServe(),
+  ballTrack: { points: [], coverage: 0 },
+  racketTrack: { points: [], coverage: 0 },
 };
 
 // vi.mock is hoisted by Vitest above every import, so the real module is
