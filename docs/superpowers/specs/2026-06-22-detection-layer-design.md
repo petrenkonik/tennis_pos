@@ -79,13 +79,18 @@ video ─► walkVideoFrames(onFrame)
   so downstream B/C can read `racketTrack.points[i]` alongside `poses[i]`.
 
 ### Model choice
-COCO already includes `sports ball` (32) and `tennis racket` (38), so no
-training is needed for bounding boxes. For A we use **TF.js `coco-ssd`
-(MobileNet, Apache-2.0)**: trivially in-browser and licence-clean. The exact
-model/runtime version is pinned (as `MEDIAPIPE_VERSION` is), with a source
-comment. Loading weights from a CDN is allowed by `task-rules §4`.
+COCO already includes `sports ball` and `tennis racket`, so no training is
+needed for bounding boxes. For A we use the **MediaPipe `ObjectDetector` task
+(`@mediapipe/tasks-vision`, EfficientDet-Lite0, COCO, Apache-2.0)**. It reuses
+the dependency, `FilesetResolver`, and WASM/CDN pattern already used by
+`extractPoses` — no new heavy runtime is added — and is licence-clean. The model
+URL/version is pinned (as `MEDIAPIPE_VERSION` is), with a source comment.
+Loading weights from a CDN is allowed by `task-rules §4`.
 
 Alternatives considered:
+- **TF.js `coco-ssd` (MobileNet, Apache-2.0)** — also licence-clean and COCO,
+  but pulls in the full `@tensorflow/tfjs` runtime as a new dependency and a
+  second backend to manage. Rejected in favour of reusing `tasks-vision`.
 - **YOLOv8n via onnxruntime-web** — better small-object (ball) recall, but
   **AGPL-3.0**, which is toxic for a product. Rejected for A; kept as a possible
   permissive-licence upgrade (YOLOX / RT-DETR, Apache-2.0) decided in B's plan
