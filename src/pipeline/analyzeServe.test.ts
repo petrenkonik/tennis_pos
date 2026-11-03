@@ -83,4 +83,47 @@ describe('analyzeServe', () => {
       expect(r.ballTrack.coverage).toBe(0);
     }
   });
+
+  it('refines contact timing when ball and racket tracks converge at the hit', async () => {
+    const poses = buildHappyServe();
+    // Ball flying toward the racket, closest at f3 — the contact frame the
+    // pose detector finds on this fixture AFTER trajectory smoothing (the
+    // smoothing shifts the wrist peak one frame earlier) — then flying away.
+    // Distances shrink strictly monotonically into f3 so the min-distance
+    // scan has a unique winner.
+    const ballY = [0.60, 0.50, 0.38, 0.20, 0.16, 0.30, 0.45];
+    const rackY = [0.45, 0.40, 0.33, 0.20, 0.30, 0.45, 0.60];
+    const detections = poses.map((p, i) => ({
+      frameIndex: p.frameIndex, timestampMs: p.timestampMs,
+      ball: { box: { x: 0.5 - 0.02, y: ballY[i] - 0.02, w: 0.04, h: 0.04 }, score: 0.9 },
+      racket: { box: { x: 0.5 - 0.02, y: rackY[i] - 0.02, w: 0.04, h: 0.04 }, score: 0.9 },
+    }));
+    const extract = async () => ({ poses, fps: 30, detections });
+    const r = await analyzeServe(video(5), 'right', undefined, { deps: { extract } });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.phases.contactSource).toBe('tracks');
+      expect(r.phases.contactDiagnostic).toBeNull();
+      expect(r.phases.confidence).toBe('high');
+      expect(r.phases.events.contactFrame).toBe(3);
+      expect(r.phases.events.contactFrame).toBeGreaterThan(r.phases.events.trophyFrame);
+    }
+  });
+
+  it('keeps pose timing and reports sparse tracks when detections are scarce', async () => {
+    const poses = buildHappyServe();
+    // Only 2 of 7 frames have detections on each class → coverage < 0.5.
+    const detections = poses.map((p, i) => ({
+      frameIndex: p.frameIndex, timestampMs: p.timestampMs,
+      ball: i % 3 === 0 ? { box: { x: 0.4, y: 0.3, w: 0.04, h: 0.04 }, score: 0.9 } : null,
+      racket: i % 3 === 0 ? { box: { x: 0.5, y: 0.3, w: 0.04, h: 0.04 }, score: 0.9 } : null,
+    }));
+    const extract = async () => ({ poses, fps: 30, detections });
+    const r = await analyzeServe(video(5), 'right', undefined, { deps: { extract } });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.phases.contactSource).toBe('pose');
+      expect(r.phases.contactDiagnostic).toBe('contact-tracks-sparse');
+    }
+  });
 });

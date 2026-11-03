@@ -7,6 +7,7 @@ import { runRules, runRulesReport } from './runRules';
 import { ALL_RULES } from '../rules';
 import type { PoseModel } from './extractPoses';
 import { buildTracks } from './buildTracks';
+import { refineContactWithTracks } from './refineContact';
 import { extractFrameData } from './extractFrameData';
 import { MAX_CLIP_SECONDS } from '../constants/biomechanics';
 
@@ -73,14 +74,20 @@ export async function analyzeServe(
   let smoothed: PoseFrame[] = [];
   try {
     smoothed = smooth(raw.poses);
-    const phases = detectPhases(smoothed, handedness, {
+    let phases = detectPhases(smoothed, handedness, {
       visibilityThreshold: options.visibilityThreshold,
       maxLowVisFraction: options.maxLowVisFraction,
     });
+    // Track-verified contact refinement (cycle B): when both object tracks are
+    // reliable, the ball↔racket closest-approach frame — cross-checked against
+    // the wrist-speed peak — may replace the pose-only contact timing. Runs
+    // BEFORE metrics/rules so every downstream measurement reads the refined
+    // contact frame. detectPhases itself stays pose-only (see refineContact).
+    const { ballTrack, racketTrack } = buildTracks(raw.detections ?? []);
+    phases = refineContactWithTracks(phases, smoothed, ballTrack, racketTrack);
     const ctx = buildPhaseContext(smoothed, raw.fps, phases);
     const findings = runRules(ctx, ALL_RULES);
     const ruleResults = runRulesReport(ctx, ALL_RULES);
-    const { ballTrack, racketTrack } = buildTracks(raw.detections ?? []);
     return { ok: true, phases, findings, ruleResults, poses: smoothed, ballTrack, racketTrack };
   } catch (e) {
     if (e instanceof ServeNotRecognizedError) {

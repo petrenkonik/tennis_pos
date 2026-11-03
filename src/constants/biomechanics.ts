@@ -74,6 +74,22 @@ export const TOSS_START_VELOCITY_THRESHOLD = 0.35;
 // still reported (the UI needs a marker position) but forces confidence 'low'.
 export const TOSS_START_FALLBACK_FRACTION = 1 / 3;
 
+// --- Track-verified contact (refineContactWithTracks) ------------------------
+// Minimum track coverage (real detections / total frames) required of BOTH the
+// ball and the racket tracks before their closest-approach frame may refine
+// the contact timing. Matches the detection-layer success bar ("ball detected
+// in ≥50% of frames of the toss→contact window"): below half the frames, the
+// minimum-distance scan is dominated by gaps rather than measurements.
+// See the event-refinement spec, threshold table.
+export const CONTACT_TRACK_COVERAGE_MIN = 0.5;
+
+// Agreement window (± frames) between the track candidate (ball↔racket closest
+// approach) and the wrist-speed peak for the refinement to be trusted.
+// ~0.1 s at 30 fps: wider than the ±2-frame phase-detection tolerance (both
+// signals carry ≈2 frames of smoothing lag), tighter than a phase width.
+// See the event-refinement spec, threshold table.
+export const CONTACT_AGREEMENT_FRAMES = 3;
+
 // Knee JOINT angle at trophy (hip-knee-ankle); 180° = straight, smaller = more bend.
 // Named JOINT_ANGLE (not FLEXION) on purpose: a flexion angle uses the opposite
 // convention (0° = straight, larger = more bend). The serve-error-detection

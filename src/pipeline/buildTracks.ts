@@ -1,6 +1,7 @@
 import type { BoxNorm, Detection, DetectionFrame, ObjectTrack, TrackPoint } from '../types';
 import {
-  TRACK_SCORE_MIN, TRACK_GATING_MAX_DIST, TRACK_MAX_GAP_FRAMES, TRACK_SMOOTH_WINDOW,
+  TRACK_SCORE_MIN, TRACK_GATING_MAX_DIST, TRACK_GATE_GAP_SCALE,
+  TRACK_GATE_MAX_DIST_CAP, TRACK_MAX_GAP_FRAMES, TRACK_SMOOTH_WINDOW,
 } from '../constants/detection';
 
 type Pt = { x: number; y: number };
@@ -16,20 +17,36 @@ function buildTrack(frames: DetectionFrame[], pick: (f: DetectionFrame) => Detec
   const pts: (TrackPoint | null)[] = new Array(n).fill(null);
 
   // 1) Accept the best detection per frame, gating against teleporting jumps.
-  let lastCenter: Pt | null = null;
+  //
+  // The gate is TIME-AWARE. The allowed jump grows with the number of frames
+  // missed since the last ACCEPTED detection (TRACK_GATING_MAX_DIST for a
+  // consecutive pair, + TRACK_GATE_GAP_SCALE per missed frame, capped at
+  // TRACK_GATE_MAX_DIST_CAP). Why: a fast ball legitimately covers more ground
+  // when the detector dropped frames in between. The earlier fixed gate did
+  // not account for the gap and never re-anchored on rejection, so one wrong
+  // rejection froze the anchor and locked the real object out forever.
+  // Rejections intentionally do NOT move the anchor — the growing-gap
+  // allowance is what lets the object catch up, while the cap still rejects a
+  // genuinely different object (background ball / second racket).
+  let lastIdx = -1; // index of the last accepted frame (-1 = nothing yet)
   let realCount = 0;
   for (let i = 0; i < n; i++) {
     const d = pick(frames[i]);
     if (!d || d.score < TRACK_SCORE_MIN) continue;
     const c = centerOf(d.box);
-    // Follow-up (sub-project B, time-aware gating): this ignores gap length, so
-    // a fast object spanning a dropped frame can be wrongly rejected here.
-    if (lastCenter && dist(c, lastCenter) > TRACK_GATING_MAX_DIST) continue; // spurious far box
+    if (lastIdx >= 0) {
+      const missed = i - lastIdx - 1;
+      const allowed = Math.min(
+        TRACK_GATE_MAX_DIST_CAP,
+        TRACK_GATING_MAX_DIST + TRACK_GATE_GAP_SCALE * missed,
+      );
+      if (dist(c, pts[lastIdx]!.center) > allowed) continue; // spurious far box
+    }
     pts[i] = {
       frameIndex: frames[i].frameIndex, timestampMs: frames[i].timestampMs,
       center: c, box: d.box, score: d.score, interpolated: false,
     };
-    lastCenter = c;
+    lastIdx = i;
     realCount++;
   }
 
