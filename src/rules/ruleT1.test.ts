@@ -12,9 +12,11 @@ function makeCtx(
     poses: [], fps: 30,
     phases: {
       handedness: 'right',
-      events: { trophyFrame: 0, contactFrame: 1, followStartFrame: 2 },
+      events: { tossStartFrame: 0, trophyFrame: 0, contactFrame: 1, followStartFrame: 2 },
       phases: { preparation: [0, 0], trophy: [0, 1], acceleration: [1, 1], followThrough: [1, 2] },
       confidence,
+      contactSource: 'pose',
+      contactDiagnostic: null,
     },
     metrics: {
       kneeFlexionAtTrophyDeg: 150,

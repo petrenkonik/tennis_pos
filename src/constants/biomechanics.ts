@@ -50,6 +50,30 @@ export const TROPHY_OVERHEAD_REF_NAME = 'nose';
 export const FALLBACK_PREP_FRACTION = 0.6;
 export const FALLBACK_ACCEL_FRACTION = 0.2;
 
+// --- Toss-start event (detectTossStart) -------------------------------------
+// The toss lift is detected from the SMOOTHED VERTICAL VELOCITY of the toss
+// wrist, not from any single frame: "the arm started rising" is a motion
+// trend, not a pose. We scan the smoothed height-derivative series for the
+// first frame whose upward rate exceeds this threshold.
+//
+// Units and sign convention: the code works with toss-wrist HEIGHT (1 − y), so
+// "up" is positive and the threshold is positive 0.35 (in the raw image-y
+// convention the same threshold would read −0.35; see the spec's threshold
+// table). In normalized units, 0.35 frame-heights/s means the wrist travels a
+// third of the frame in one second — far faster than idle sway or camera
+// shake, and comfortably below a real toss lift (~2-4 frame-heights/s at
+// 30 fps on the demo clip and synthetic serves).
+// Calibration: empirical, tuned on the demo clip + synthetic serves.
+// PROVISIONAL — recalibrate on a labeled serve set (tracked follow-up).
+export const TOSS_START_VELOCITY_THRESHOLD = 0.35;
+
+// When no frame crosses the threshold (the toss lift is hidden by noise, or
+// the clip starts mid-motion), fall back to a time split: preparation on a
+// side-view serve spans roughly [0, 0.6n) (FALLBACK_PREP_FRACTION), so the
+// interior third of the clip is the most plausible toss moment. The event is
+// still reported (the UI needs a marker position) but forces confidence 'low'.
+export const TOSS_START_FALLBACK_FRACTION = 1 / 3;
+
 // Knee JOINT angle at trophy (hip-knee-ankle); 180° = straight, smaller = more bend.
 // Named JOINT_ANGLE (not FLEXION) on purpose: a flexion angle uses the opposite
 // convention (0° = straight, larger = more bend). The serve-error-detection

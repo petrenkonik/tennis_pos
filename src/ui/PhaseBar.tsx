@@ -40,10 +40,16 @@ export function PhaseBar({
   const { t } = useTranslation();
   const interactive = !!onSelect;
   const last = phases.phases.followThrough[1] || 1;
+  // Toss-start event marker position, as a share of the bar (same frame→width
+  // mapping as the phase segments, so the tick lines up with the video time).
+  // Hidden when the event was never resolved (-1).
+  const tossPct = phases.events.tossStartFrame >= 0
+    ? (phases.events.tossStartFrame / last) * 100
+    : null;
   return (
     <div
       className={cn(
-        'flex h-11 w-full overflow-hidden rounded-lg border bg-card shadow-sm',
+        'relative flex h-11 w-full overflow-hidden rounded-lg border bg-card shadow-sm',
         interactive && 'h-auto',
       )}
       role="group"
@@ -52,6 +58,17 @@ export function PhaseBar({
       // selected phase (or none). Drag-out through the border still fires.
       onMouseLeave={onHover ? () => onHover(null) : undefined}
     >
+      {/* Toss-start event tick (Layer 1): the moment the toss arm starts
+          rising, detected from the wrist's upward velocity — not a phase, just
+          a moment marker overlaid on the preparation span. */}
+      {tossPct != null && (
+        <div
+          className="pointer-events-none absolute inset-y-0 z-20 w-0.5 -translate-x-1/2 bg-primary"
+          style={{ left: `${tossPct}%` }}
+          title={t('phases.tossStart')}
+          data-testid="toss-start-marker"
+        />
+      )}
       {PHASE_KEYS.map((key, i) => {
         const [start, end] = phases.phases[key];
         const width = `${Math.max(0, ((end - start) / last) * 100)}%`;

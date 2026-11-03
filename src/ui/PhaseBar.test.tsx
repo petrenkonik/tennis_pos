@@ -5,9 +5,11 @@ import type { Phases } from '../types';
 
 const phases: Phases = {
   handedness: 'right',
-  events: { trophyFrame: 2, contactFrame: 4, followStartFrame: 6 },
+  events: { tossStartFrame: 1, trophyFrame: 2, contactFrame: 4, followStartFrame: 6 },
   phases: { preparation: [0, 2], trophy: [2, 3], acceleration: [3, 4], followThrough: [4, 6] },
   confidence: 'high',
+  contactSource: 'pose',
+  contactDiagnostic: null,
 };
 
 describe('PhaseBar', () => {
@@ -16,6 +18,23 @@ describe('PhaseBar', () => {
     for (const label of ['Preparation', 'Trophy', 'Acceleration', 'Follow-through']) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
+  });
+
+  it('renders the toss-start event tick inside the preparation span', () => {
+    render(<PhaseBar phases={phases} />);
+    const marker = screen.getByTestId('toss-start-marker');
+    expect(marker).toHaveAttribute('title', 'Toss start');
+    // left% = tossStartFrame / last * 100 = 1/6 of the bar, inside preparation.
+    expect(parseFloat(marker.style.left)).toBeCloseTo(100 / 6, 10);
+  });
+
+  it('hides the toss tick when the event is unresolved (-1)', () => {
+    const noToss: Phases = {
+      ...phases,
+      events: { ...phases.events, tossStartFrame: -1 },
+    };
+    render(<PhaseBar phases={noToss} />);
+    expect(screen.queryByTestId('toss-start-marker')).not.toBeInTheDocument();
   });
 
   it('renders a button per phase when onSelect is provided', () => {

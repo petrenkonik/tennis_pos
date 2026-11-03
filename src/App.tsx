@@ -550,6 +550,19 @@ export default function App() {
                 onHover={setHoveredPhase}
               />
               <p className="text-xs text-muted-foreground">{t('controls.phaseHint')}</p>
+              {/* Layer 1 education: explain the toss-start marker and the
+                  contact-timing provenance so the user can judge confidence. */}
+              {result.phases.events.tossStartFrame >= 0 && (
+                <p className="text-xs text-muted-foreground">{t('events.tossStartHint')}</p>
+              )}
+              {result.phases.contactDiagnostic && (
+                <p className="text-xs text-muted-foreground">
+                  {t(`events.${result.phases.contactDiagnostic}`)}
+                </p>
+              )}
+              {!result.phases.contactDiagnostic && result.phases.contactSource === 'tracks' && (
+                <p className="text-xs text-muted-foreground">{t('events.contactFromTracks')}</p>
+              )}
             </section>
 
             <section className="space-y-3">

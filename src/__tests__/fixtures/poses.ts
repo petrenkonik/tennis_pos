@@ -39,7 +39,29 @@ function toss(wristY: number) {
 }
 
 // Deterministic right-handed serve: trophy=2, contact=4, followStart=6.
+// The toss arm rises f0→f2 (peak at the trophy) and falls after, like a real
+// serve — detectTossStart then reads tossStartFrame=1 with confidence, keeping
+// the overall phases confidence 'high'.
 export function buildHappyServe(): PoseFrame[] {
+  const specs: Array<[ 'straight'|'bent'|'deep', number, number, number ]> = [
+    ['straight', 0.70, 0.62, 0.70], // f0 prep, racket low, toss low
+    ['bent',     0.55, 0.50, 0.45], // f1 rising (not overhead), toss rising
+    ['deep',     0.45, 0.42, 0.15], // f2 trophy: overhead + deepest knee, toss peak
+    ['bent',     0.30, 0.28, 0.30], // f3 overhead, rising, toss dropping
+    ['straight', 0.15, 0.35, 0.55], // f4 contact: highest + straight elbow
+    ['straight', 0.40, 0.45, 0.60], // f5 descending (still overhead)
+    ['straight', 0.62, 0.58, 0.60], // f6 follow start: wrist below shoulder (0.55)
+  ];
+  return specs.map(([bend, wY, eY, tY], i) =>
+    makeFrame(i, makeLandmarks({ ...nose, ...knee(bend), ...arm(wY, eY), ...toss(tY) })));
+}
+
+// Right-handed serve where the toss arm NEVER lifts (constant toss-wrist y, as
+// if the toss is occluded or the clip starts mid-motion). detectTossStart
+// cannot find a velocity crossing and falls back to round(n/3) with
+// confident=false, which alone must drop the overall phases confidence to
+// 'low' even though trophy/contact/follow-through are all cleanly detected.
+export function buildNoTossServe(): PoseFrame[] {
   const specs: Array<[ 'straight'|'bent'|'deep', number, number ]> = [
     ['straight', 0.70, 0.62], // f0 prep, racket low
     ['bent',     0.55, 0.50], // f1 rising (not overhead)
@@ -47,10 +69,10 @@ export function buildHappyServe(): PoseFrame[] {
     ['bent',     0.30, 0.28], // f3 overhead, rising
     ['straight', 0.15, 0.35], // f4 contact: highest + straight elbow
     ['straight', 0.40, 0.45], // f5 descending (still overhead)
-    ['straight', 0.62, 0.58], // f6 follow start: wrist below shoulder (0.55)
+    ['straight', 0.62, 0.58], // f6 follow start: wrist below shoulder
   ];
   return specs.map(([bend, wY, eY], i) =>
-    makeFrame(i, makeLandmarks({ ...nose, ...knee(bend), ...arm(wY, eY) })));
+    makeFrame(i, makeLandmarks({ ...nose, ...knee(bend), ...arm(wY, eY), ...toss(0.65) })));
 }
 
 // Right-handed serve where the DEEPEST knee bend lands AFTER contact (the landing

@@ -29,7 +29,7 @@ const successResult: AnalysisResult = {
   ok: true,
   phases: {
     handedness: 'right',
-    events: { trophyFrame: 2, contactFrame: 4, followStartFrame: 6 },
+    events: { tossStartFrame: 1, trophyFrame: 2, contactFrame: 4, followStartFrame: 6 },
     phases: {
       preparation: [0, 2],
       trophy: [2, 3],
@@ -37,6 +37,8 @@ const successResult: AnalysisResult = {
       followThrough: [4, 6],
     },
     confidence: 'high',
+    contactSource: 'pose',
+    contactDiagnostic: null,
   },
   findings: [],
   ruleResults: [],

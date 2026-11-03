@@ -1,17 +1,19 @@
 import { describe, it, expect } from 'vitest';
-import { detectPhases, ServeNotRecognizedError, visibilityBreakdown } from './detectPhases';
-import { buildHappyServe, buildLandingCrouchServe, buildTossGateServe, buildKneeAfterTrophyServe, buildNoConfidentContactServe, makeFrame, makeLandmarks } from '../__tests__/fixtures/poses';
+import { detectPhases, detectTossStart, ServeNotRecognizedError, visibilityBreakdown } from './detectPhases';
+import { buildHappyServe, buildNoTossServe, buildLandingCrouchServe, buildTossGateServe, buildKneeAfterTrophyServe, buildNoConfidentContactServe, makeFrame, makeLandmarks } from '../__tests__/fixtures/poses';
 import { LM } from '../pose/landmarks';
 
 describe('detectPhases', () => {
   it('detects events and phases on a clean serve', () => {
     const r = detectPhases(buildHappyServe(), 'right');
-    expect(r.events).toEqual({ trophyFrame: 2, contactFrame: 4, followStartFrame: 6 });
+    expect(r.events).toEqual({ tossStartFrame: 1, trophyFrame: 2, contactFrame: 4, followStartFrame: 6 });
     expect(r.phases.preparation).toEqual([0, 2]);
     expect(r.phases.trophy).toEqual([2, 3]);
     expect(r.phases.acceleration).toEqual([3, 4]);
     expect(r.phases.followThrough).toEqual([4, 6]);
     expect(r.confidence).toBe('high');
+    expect(r.contactSource).toBe('pose');
+    expect(r.contactDiagnostic).toBeNull();
   });
 
   it('falls back to a time split when trophy is not expressed', () => {
@@ -131,5 +133,70 @@ describe('detectPhases', () => {
     expect(r.events.contactFrame).toBeLessThan(r.events.followStartFrame);
     // phases must not collapse to a degenerate [n, n] interval
     expect(r.phases.acceleration[1]).toBeGreaterThan(r.phases.acceleration[0]);
+  });
+});
+
+describe('detectPhases — toss start event', () => {
+  it('keeps the tossStart ≤ trophy ordering invariant on every fixture', () => {
+    for (const poses of [
+      buildHappyServe(), buildNoTossServe(), buildLandingCrouchServe(),
+      buildTossGateServe(), buildKneeAfterTrophyServe(), buildNoConfidentContactServe(),
+    ]) {
+      const r = detectPhases(poses, 'right');
+      expect(r.events.tossStartFrame).toBeLessThanOrEqual(r.events.trophyFrame);
+      expect(r.events.tossStartFrame).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it('falls back to a time split frame and low confidence when the toss never lifts', () => {
+    // Toss wrist is constant → no velocity crossing → fallback round(n/3).
+    // Contact/trophy/follow-through are all clean, so the toss fallback alone
+    // must be what drops confidence to 'low'.
+    const r = detectPhases(buildNoTossServe(), 'right');
+    expect(r.events.tossStartFrame).toBe(2); // round(7/3), clamped ≤ trophy=2
+    expect(r.confidence).toBe('low');
+    expect(r.contactSource).toBe('pose');
+    expect(r.contactDiagnostic).toBeNull();
+  });
+
+  it('reports a fallback-time contact source when trophy is not expressed', () => {
+    const poses = Array.from({ length: 10 }, (_, i) =>
+      makeFrame(i, makeLandmarks({ [LM.NOSE]: { y: 0.5 }, [LM.R_WRIST]: { y: 0.7 } })));
+    const r = detectPhases(poses, 'right');
+    expect(r.contactSource).toBe('fallback-time');
+    expect(r.contactDiagnostic).toBeNull();
+  });
+});
+
+describe('detectTossStart', () => {
+  it('finds the first frame of a sustained toss lift (±1 frame of smoothing lag)', () => {
+    // Toss wrist height rises from f1 onward (buildHappyServe: y 0.70→0.45→0.15).
+    const { frame, confident } = detectTossStart(buildHappyServe(), 'right');
+    expect(frame).toBe(1);
+    expect(confident).toBe(true);
+  });
+
+  it('returns the fallback frame with confident=false for a flat toss arm', () => {
+    const poses = Array.from({ length: 9 }, (_, i) =>
+      makeFrame(i, makeLandmarks({ [LM.L_WRIST]: { y: 0.6 } })));
+    const { frame, confident } = detectTossStart(poses, 'right');
+    expect(frame).toBe(3); // round(9/3)
+    expect(confident).toBe(false);
+  });
+
+  it('is handedness-aware: a lefty toss reads the RIGHT wrist', () => {
+    // The fixture raises the LEFT wrist (the righty's toss arm) and the RIGHT
+    // wrist (the racket arm). For a lefty the "toss wrist" is the RIGHT one —
+    // so the detector must find THAT lift (frame 1, confident), proving it
+    // switched wrists rather than re-reading the righty's toss arm.
+    const { frame, confident } = detectTossStart(buildHappyServe(), 'left');
+    expect(confident).toBe(true);
+    expect(frame).toBe(1);
+  });
+
+  it('degrades safely on a single-frame clip', () => {
+    const { frame, confident } = detectTossStart(buildHappyServe().slice(0, 1), 'right');
+    expect(frame).toBe(0);
+    expect(confident).toBe(false);
   });
 });

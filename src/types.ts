@@ -11,9 +11,25 @@ export type Handedness = 'right' | 'left';
 // yet. Re-add it when a rule distinguishes a middle grade.
 export type Confidence = 'low' | 'high';
 
+// How the contact timing in `events.contactFrame` was established:
+// - 'pose'          — pose-only detection (wrist-height peak + extended elbow);
+// - 'tracks'        — refined by the ball↔racket track minimum distance,
+//                     cross-checked against the wrist-speed peak;
+// - 'fallback-time' — events are a time-based split (trophy not expressed).
+export type ContactSource = 'pose' | 'tracks' | 'fallback-time';
+
 export interface Phases {
   handedness: Handedness;
-  events: { trophyFrame: number; contactFrame: number; followStartFrame: number };
+  events: {
+    // First frame of the toss lift, from the smoothed vertical velocity of the
+    // toss wrist (see detectTossStart). Always a valid frame index: when the
+    // lift cannot be detected, a time-based fallback frame is used instead and
+    // `confidence` drops to 'low'.
+    tossStartFrame: number;
+    trophyFrame: number;
+    contactFrame: number;
+    followStartFrame: number;
+  };
   phases: {
     preparation: [number, number];
     trophy: [number, number];
@@ -21,6 +37,14 @@ export interface Phases {
     followThrough: [number, number];
   };
   confidence: Confidence;
+  // Provenance of the contact timing (see ContactSource). detectPhases itself
+  // always produces 'pose' (or 'fallback-time'); the track refinement step in
+  // analyzeServe may upgrade it to 'tracks'.
+  contactSource: ContactSource;
+  // Machine-readable diagnostic explaining a degraded refinement outcome
+  // (e.g. 'contact-tracks-sparse', 'contact-track-mismatch'). Always null from
+  // detectPhases; the UI translates non-null values via t().
+  contactDiagnostic: string | null;
 }
 
 export interface PhaseContext {

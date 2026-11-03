@@ -1,11 +1,13 @@
-import type { PoseFrame, Phases, Handedness, Confidence } from '../types';
+import type { PoseFrame, Phases, Handedness, Confidence, ContactSource } from '../types';
 import { LM, racketWrist, racketShoulder } from '../pose/landmarks';
 import { kneeJointAngle, elbowExtension, racketWristHeight, tossWristHeight } from '../pose/metrics';
 import { localMaxima } from '../pose/geometry';
+import { derivative, firstIdx } from './signals';
 import {
   CONTACT_ELBOW_MIN_DEG, CONTACT_HEIGHT_PROMINENCE, VISIBILITY_THRESHOLD,
   MAX_LOW_VIS_FRACTION, FALLBACK_PREP_FRACTION, FALLBACK_ACCEL_FRACTION,
   DIAGNOSTIC_MIN_LOW_FRAC, TROPHY_OVERHEAD_REF_LM,
+  TOSS_START_VELOCITY_THRESHOLD, TOSS_START_FALLBACK_FRACTION,
 } from '../constants/biomechanics';
 
 // Machine-readable diagnostic codes that the UI (App.tsx) resolves via t().
@@ -62,13 +64,14 @@ export interface GateOptions {
 }
 
 function assemble(
-  h: Handedness, trophyFrame: number, contactFrame: number,
+  h: Handedness, tossStartFrame: number, trophyFrame: number, contactFrame: number,
   followStartFrame: number, last: number, confidence: Confidence,
+  contactSource: ContactSource = 'pose',
 ): Phases {
   const accelStart = Math.min(trophyFrame + 1, contactFrame);
   return {
     handedness: h,
-    events: { trophyFrame, contactFrame, followStartFrame },
+    events: { tossStartFrame, trophyFrame, contactFrame, followStartFrame },
     phases: {
       preparation: [0, trophyFrame],
       trophy: [trophyFrame, accelStart],
@@ -76,14 +79,52 @@ function assemble(
       followThrough: [contactFrame, last],
     },
     confidence,
+    contactSource,
+    contactDiagnostic: null,
   };
 }
 
-function timeBasedFallback(poses: PoseFrame[], h: Handedness): Phases {
+function timeBasedFallback(poses: PoseFrame[], h: Handedness, tossFrame: number): Phases {
   const last = poses.length - 1;
   const trophyFrame = Math.round(last * FALLBACK_PREP_FRACTION);
   const contactFrame = Math.round(last * (FALLBACK_PREP_FRACTION + FALLBACK_ACCEL_FRACTION));
-  return assemble(h, trophyFrame, contactFrame, contactFrame, last, 'low');
+  // Keep the event ordering invariant (tossStart ≤ trophy) even in the fallback.
+  const tossStartFrame = Math.min(tossFrame, trophyFrame);
+  return assemble(h, tossStartFrame, trophyFrame, contactFrame, contactFrame, last, 'low', 'fallback-time');
+}
+
+// Toss start = the first frame where the toss wrist is rising FAST ENOUGH to
+// be a deliberate lift, read from a motion signal rather than any single pose.
+//
+// Why a velocity signal (educational note): the question "when did the serve
+// motion begin?" has no per-frame answer — the wrist is somewhere above the
+// hip for the whole stance. What distinguishes the toss lift is a *sustained*
+// upward trend. So we convert the toss-wrist height series (1 − y, up = positive)
+// into a smoothed vertical-velocity signal (see `derivative` in signals.ts for
+// the central-difference + smoothing math) and scan for the first crossing of
+// TOSS_START_VELOCITY_THRESHOLD. Camera shake and idle sway stay below the
+// threshold; a real lift crosses it within a frame or two of the arm starting
+// to move. Scanning starts at frame 1 because the frame-0 derivative is
+// one-sided (a clip that already starts mid-lift would fire on frame 0's
+// noisy estimate).
+//
+// Returns the fallback frame (round(n·TOSS_START_FALLBACK_FRACTION),
+// confident=false) when nothing crosses — e.g. the toss is occluded, or the
+// clip starts mid-motion. The caller keeps the frame (the UI still needs a
+// marker position) but drops overall confidence to 'low'.
+export function detectTossStart(
+  poses: PoseFrame[], h: Handedness,
+): { frame: number; confident: boolean } {
+  const n = poses.length;
+  if (n < 2) return { frame: 0, confident: false };
+
+  const tossH = poses.map(p => tossWristHeight(p, h));
+  const vy = derivative(tossH, poses.map(p => p.timestampMs));
+  const detected = firstIdx(vy, 1, v => v > TOSS_START_VELOCITY_THRESHOLD);
+  if (detected >= 0) return { frame: detected, confident: true };
+
+  const fallback = Math.round(n * TOSS_START_FALLBACK_FRACTION);
+  return { frame: Math.min(Math.max(fallback, 1), n - 1), confident: false };
 }
 
 // Contact = global highest racket-wrist peak with an extended elbow. Detected
@@ -173,6 +214,9 @@ export function detectPhases(
   const last = poses.length - 1;
 
   // 2) contact first (trophy-independent), then trophy bounded before it.
+  // The toss-start event is detected independently (it lives in the first
+  // third of the clip and cannot collide with contact/trophy search windows).
+  const toss = detectTossStart(poses, h);
   const contact = detectContact(poses, h);
   // Bound the trophy search by contact even when contact is low-confidence: the
   // best-effort global-max contact frame is still a better ceiling than the whole
@@ -180,11 +224,19 @@ export function detectPhases(
   // force a degenerate (clamped) phase split.
   const searchEnd = contact.frame;
   const trophy = detectTrophy(poses, h, searchEnd);
-  if (trophy.frame < 0) return timeBasedFallback(poses, h);
+  if (trophy.frame < 0) return timeBasedFallback(poses, h, toss.frame);
 
   let trophyFrame = trophy.frame;
   let contactFrame = contact.frame;
-  let confidence: Confidence = contact.confident && trophy.confident ? 'high' : 'low';
+  let confidence: Confidence =
+    contact.confident && trophy.confident && toss.confident ? 'high' : 'low';
+
+  // Event ordering invariant: the toss lift always precedes (or coincides
+  // with) the trophy pose. A noisy velocity signal can in principle fire after
+  // the trophy (e.g. a second arm raise); clamping keeps the marker inside the
+  // preparation span it belongs to, and the clamp costs a confidence tier.
+  let tossStartFrame = Math.min(toss.frame, trophyFrame);
+  if (tossStartFrame !== toss.frame) confidence = 'low';
 
   // 3) follow-through start = first post-contact frame with wrist below shoulder
   let followStartFrame = -1;
@@ -209,5 +261,5 @@ export function detectPhases(
     clampMinWidths();
   }
 
-  return assemble(h, trophyFrame, contactFrame, followStartFrame, last, confidence);
+  return assemble(h, tossStartFrame, trophyFrame, contactFrame, followStartFrame, last, confidence);
 }

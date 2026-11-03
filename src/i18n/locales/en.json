@@ -51,7 +51,15 @@
     "preparation": "Preparation",
     "trophy": "Trophy",
     "acceleration": "Acceleration",
-    "followThrough": "Follow-through"
+    "followThrough": "Follow-through",
+    "tossStart": "Toss start"
+  },
+  "events": {
+    "tossStartHint": "The vertical tick marks the toss start — the moment the toss arm begins its upward lift. It is found from the arm's motion (a sustained rise in wrist speed), not from a single frozen frame.",
+    "contactFromTracks": "Contact timing verified against the ball track: the moment the ball and racket come closest agrees with the wrist-speed peak.",
+    "contactTrackMismatch": "The ball↔racket closest moment disagrees with the wrist-speed peak, so the pose-based timing is kept (lower confidence).",
+    "contactTracksSparse": "The ball or racket was detected in too few frames to verify the contact timing; the pose-based estimate is used.",
+    "contactFallbackTime": "The trophy pose was not clearly expressed, so phase boundaries are a time-based estimate."
   },
   "statusBadge": {
     "ok": "normal",
