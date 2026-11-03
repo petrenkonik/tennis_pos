@@ -90,6 +90,21 @@ export const CONTACT_TRACK_COVERAGE_MIN = 0.5;
 // See the event-refinement spec, threshold table.
 export const CONTACT_AGREEMENT_FRAMES = 3;
 
+// --- Layer 2: swing speed in physical units (peakWristSpeedMs) ---------------
+// MediaPipe coordinates measure the IMAGE, not the world. To convert speed
+// into m/s we read the player's body extent in frame (nose→ankle mid) as a
+// built-in ruler. The nose sits below the crown and the ankle-mid above the
+// sole, so the measured extent UNDER-reports standing height; this scale
+// restores the missing head/foot fraction. Geometry estimate, provisional
+// like the rest — see the event-refinement spec, threshold table.
+export const BODY_HEIGHT_SCALE = 1.25;
+
+// Default real-world height for the m/s conversion when the user has not set
+// their own (population-average). Per-user override lives in the UI settings
+// (App.tsx) — a wrong value scales every m/s number linearly, so the UI marks
+// the metric as an estimate based on this setting.
+export const PLAYER_HEIGHT_DEFAULT_CM = 175;
+
 // Knee JOINT angle at trophy (hip-knee-ankle); 180° = straight, smaller = more bend.
 // Named JOINT_ANGLE (not FLEXION) on purpose: a flexion angle uses the opposite
 // convention (0° = straight, larger = more bend). The serve-error-detection

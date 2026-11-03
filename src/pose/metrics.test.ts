@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   kneeJointAngle, elbowExtension, racketWristHeight, tossWristHeight,
   racketElbowHeight, racketShoulderHeight, tossShoulderHeight, hipCenterX, footCenterX,
+  bodyHeightUnits, peakWristSpeedMs,
 } from './metrics';
 import { jointAngle } from './geometry';
 import { LM } from './landmarks';
@@ -17,6 +18,8 @@ function makeLandmarks(overrides: Record<number, Partial<Landmark>> = {}): Landm
   return a;
 }
 const frame = (lm: Landmark[]): PoseFrame => ({ frameIndex: 0, timestampMs: 0, landmarks: lm });
+const frameAt = (i: number, lm: Landmark[]): PoseFrame =>
+  ({ frameIndex: i, timestampMs: (i / 30) * 1000, landmarks: lm });
 
 describe('pose metrics', () => {
   it('kneeJointAngle returns 180 for straight legs', () => {
@@ -131,6 +134,93 @@ describe('pose metrics', () => {
         [LM.L_HIP]: { x: 0.48 }, [LM.R_HIP]: { x: 0.52 },
       }));
       expect(footCenterX(f)).toBeCloseTo(0.5, 5);
+    });
+  });
+
+  describe('bodyHeightUnits', () => {
+    // Nose at y 0.2, ankles at y 0.8 → extent 0.6 × BODY_HEIGHT_SCALE (1.25) = 0.75.
+    const standing = () => frame(makeLandmarks({
+      [LM.NOSE]: { x: 0.5, y: 0.2 },
+      [LM.L_ANKLE]: { x: 0.45, y: 0.8 }, [LM.R_ANKLE]: { x: 0.55, y: 0.8 },
+    }));
+
+    it('scales the nose→ankle-mid extent by BODY_HEIGHT_SCALE', () => {
+      expect(bodyHeightUnits(standing())).toBeCloseTo(0.75, 5);
+    });
+
+    it('is NaN when the nose is not reliable (no ruler in frame)', () => {
+      const f = frame(makeLandmarks({
+        [LM.NOSE]: { y: 0.2, visibility: 0.2 },
+        [LM.L_ANKLE]: { y: 0.8 }, [LM.R_ANKLE]: { y: 0.8 },
+      }));
+      expect(Number.isNaN(bodyHeightUnits(f))).toBe(true);
+    });
+
+    it('is NaN when neither ankle is reliable', () => {
+      const f = frame(makeLandmarks({
+        [LM.NOSE]: { y: 0.2 },
+        [LM.L_ANKLE]: { y: 0.8, visibility: 0.1 }, [LM.R_ANKLE]: { y: 0.8, visibility: 0.1 },
+      }));
+      expect(Number.isNaN(bodyHeightUnits(f))).toBe(true);
+    });
+
+    it('uses the visible ankle when the other is occluded', () => {
+      const f = frame(makeLandmarks({
+        [LM.NOSE]: { x: 0.5, y: 0.2 },
+        [LM.L_ANKLE]: { y: 0.8, visibility: 0.1 }, [LM.R_ANKLE]: { x: 0.55, y: 0.8 },
+      }));
+      expect(bodyHeightUnits(f)).toBeCloseTo(0.75, 5);
+    });
+  });
+
+  describe('peakWristSpeedMs', () => {
+    // A linear swing: the racket wrist moves +0.1 x per frame → 3 units/s at
+    // 30 fps. Body ruler: nose 0.2 → ankles 0.8 → 0.75 units ≈ 1.75 m →
+    // 3 units/s × (1.75 / 0.75) = 7.0 m/s at the default 175 cm.
+    const swing = () => Array.from({ length: 6 }, (_, i) => frameAt(i, makeLandmarks({
+      [LM.NOSE]: { x: 0.5, y: 0.2 },
+      [LM.L_ANKLE]: { x: 0.45, y: 0.8 }, [LM.R_ANKLE]: { x: 0.55, y: 0.8 },
+      [LM.R_WRIST]: { x: 0.3 + i * 0.1, y: 0.5 },
+    })));
+
+    it('converts a synthetic linear swing into m/s via the body ruler', () => {
+      expect(peakWristSpeedMs(swing(), 'right', 0, 5, 175)).toBeCloseTo(7.0, 3);
+    });
+
+    it('scales linearly with the player-height setting', () => {
+      const at175 = peakWristSpeedMs(swing(), 'right', 0, 5, 175);
+      const at160 = peakWristSpeedMs(swing(), 'right', 0, 5, 160);
+      expect(at160).toBeCloseTo(at175 * (160 / 175), 3);
+    });
+
+    it('ignores speed peaks outside the measurement window', () => {
+      const poses = swing();
+      // A teleport AFTER the window must not win. The window is narrowed to
+      // [0,2] so the teleport's smoothing halo (±2 frames around the spike)
+      // cannot bleed into it either.
+      poses.push(frameAt(6, makeLandmarks({
+        [LM.NOSE]: { x: 0.5, y: 0.2 },
+        [LM.L_ANKLE]: { x: 0.45, y: 0.8 }, [LM.R_ANKLE]: { x: 0.55, y: 0.8 },
+        [LM.R_WRIST]: { x: 0.95, y: 0.5 },
+      })));
+      expect(peakWristSpeedMs(poses, 'right', 0, 2, 175)).toBeCloseTo(7.0, 3);
+    });
+
+    it('is NaN when the body ruler is unreadable at the peak frame', () => {
+      // Occlude the ankles everywhere: argmax lands on a frame whose ruler is
+      // NaN no matter which frame wins the tie.
+      const poses = swing().map(f => {
+        f.landmarks[LM.L_ANKLE].visibility = 0.1;
+        f.landmarks[LM.R_ANKLE].visibility = 0.1;
+        return f;
+      });
+      expect(Number.isNaN(peakWristSpeedMs(poses, 'right', 0, 5, 175))).toBe(true);
+    });
+
+    it('is NaN for degenerate inputs (too few frames, empty window)', () => {
+      expect(Number.isNaN(peakWristSpeedMs([], 'right', 0, 0, 175))).toBe(true);
+      expect(Number.isNaN(peakWristSpeedMs(swing().slice(0, 1), 'right', 0, 0, 175))).toBe(true);
+      expect(Number.isNaN(peakWristSpeedMs(swing(), 'right', 4, 1, 175))).toBe(true);
     });
   });
 });

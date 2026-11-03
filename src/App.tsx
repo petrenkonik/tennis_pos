@@ -7,7 +7,9 @@ import { DEFAULT_MODEL, type PoseModel } from './pipeline/extractPoses';
 import {
   DEFAULT_UI_VISIBILITY_THRESHOLD,
   DEFAULT_UI_MAX_LOW_VIS_FRACTION,
+  PLAYER_HEIGHT_DEFAULT_CM,
 } from './constants/biomechanics';
+import { peakWristSpeedMs } from './pose/metrics';
 import { DEMO_CLIPS, type DemoClip } from './constants/demoClips';
 import { resolveAsset } from './lib/resolveAsset';
 import {
@@ -19,6 +21,7 @@ import {
 import { frameToMs, type PhaseKey } from './lib/phaseTime';
 import { PHASE_LANDMARKS } from './pose/phaseLandmarks';
 import { PhaseBar } from './ui/PhaseBar';
+import { SpeedCard } from './ui/SpeedCard';
 import { AdviceList } from './ui/AdviceList';
 import type { RuleResult } from './rules/types';
 import { RulesReport } from './ui/RulesReport';
@@ -73,6 +76,10 @@ export default function App() {
   const [model, setModel] = useState<PoseModel>(DEFAULT_MODEL);
   const [visTh, setVisTh] = useState(DEFAULT_UI_VISIBILITY_THRESHOLD);
   const [maxLowVis, setMaxLowVis] = useState(DEFAULT_UI_MAX_LOW_VIS_FRACTION);
+  // Real height of the player (cm) — converts the measured swing into m/s
+  // (Layer 2). A wrong value scales every m/s number linearly, so the speed
+  // card labels its output as an estimate based on this setting.
+  const [playerHeightCm, setPlayerHeightCm] = useState(PLAYER_HEIGHT_DEFAULT_CM);
 
   // Phase review: clicking a phase block seeks the video to its start and plays
   // it slowly to the phase end, then pauses. `selectedPhase` is the highlighted
@@ -170,6 +177,16 @@ export default function App() {
   // rule wins over a selected phase (rules carry a verdict the eye should land
   // on first). Order: hovered rule → hovered phase → selected rule → selected phase.
   const ruleResults = result?.ok ? result.ruleResults : undefined;
+  // Layer-2 swing speed: peak racket-wrist speed over the swing window
+  // (trophy → follow-through start), converted to m/s through the height
+  // setting. NaN → the SpeedCard renders "undetermined".
+  const speedMs = result?.ok && result.phases.events.trophyFrame >= 0
+    ? peakWristSpeedMs(
+        result.poses, result.phases.handedness,
+        result.phases.events.trophyFrame, result.phases.events.followStartFrame,
+        playerHeightCm,
+      )
+    : NaN;
   const activeRuleId = hoveredRuleId ?? selectedRuleId;
   const activeRule = activeRuleId
     ? ruleResults?.find((r) => r.ruleId === activeRuleId)
@@ -434,6 +451,20 @@ export default function App() {
                     {t('controls.maxLowVisHelp')}
                   </small>
                 </label>
+                <label className="flex flex-col gap-1.5 text-sm">
+                  <span className="font-medium">
+                    {t('controls.playerHeight', { n: playerHeightCm })}
+                  </span>
+                  <input
+                    type="number" min={120} max={220} step={1} value={playerHeightCm}
+                    onChange={(e) => setPlayerHeightCm(Number(e.target.value) || PLAYER_HEIGHT_DEFAULT_CM)}
+                    disabled={isBusy}
+                    className="h-9 rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  />
+                  <small className="text-xs text-muted-foreground">
+                    {t('controls.playerHeightHelp')}
+                  </small>
+                </label>
               </div>
             )}
 
@@ -563,6 +594,11 @@ export default function App() {
               {!result.phases.contactDiagnostic && result.phases.contactSource === 'tracks' && (
                 <p className="text-xs text-muted-foreground">{t('events.contactFromTracks')}</p>
               )}
+            </section>
+
+            <section className="space-y-2">
+              <SectionLabel>{t('speedCard.section')}</SectionLabel>
+              <SpeedCard speedMs={speedMs} />
             </section>
 
             <section className="space-y-3">

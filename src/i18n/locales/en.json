@@ -22,7 +22,9 @@
     "tryDemo": "Try a demo serve",
     "phaseSpeed": "Phase playback speed: {{n}}×",
     "phaseSpeedHelp": "Applied when a phase block is selected — click a block to replay it slowly.",
-    "phaseHint": "Click a phase to replay it slowly. Double-click the video to clear."
+    "phaseHint": "Click a phase to replay it slowly. Double-click the video to clear.",
+    "playerHeight": "Player height: {{n}} cm",
+    "playerHeightHelp": "Converts the measured swing into m/s. The estimate scales with this value — set your real height."
   },
   "demo": {
     "serveRightSide": {
@@ -84,6 +86,15 @@
   "advice": {
     "empty": "No errors found — nice serve!",
     "maybe": "Maybe: "
+  },
+  "speedCard": {
+    "section": "Serve speed",
+    "title": "Peak swing speed",
+    "unit": "m/s",
+    "rangeNorm": "{{from}}–{{to}} m/s",
+    "unknown": "Not measurable on this clip — the body scale (nose/ankles) is not readable, so meters per second cannot be estimated.",
+    "why": "Hand speed at the top of the swing is the engine of serve power: the racket head multiplies it several times on the way to the ball, so a slow peak almost always means a low-powered serve. It also shows how well the legs and torso feed energy into the arm.",
+    "estimateNote": "Estimate: converted to m/s using your height setting and the body scale in frame (side-view 2D measurement — treat it as a trend, not a radar gun)."
   },
   "rules": {
     "C3": {
