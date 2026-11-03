@@ -87,6 +87,8 @@ Possible sources:
 ## What is NOT in the prototype
 
 - **3D kinematics.** MediaPipe gives 3D landmarks, but depth-estimate reliability varies. In the prototype we rely mostly on 2D + careful use of visibility metrics.
-- **Serve speed.** Requires ball tracking (YOLO) and perspective calibration — deferred.
+- **Ball speed (km/h, like a radar gun).** Measuring how fast the BALL leaves the racket needs accurate ball tracking plus perspective calibration of the court — deferred.
 - **Comparison with a reference (Layer 3)** — partial in the prototype, but a full overlay model needs a set of reference videos.
 - **Serve series / progress** — future; the prototype works with one serve at a time.
+
+> What the prototype DOES measure today: the peak **hand** (racket-wrist) speed of the swing, converted to m/s through the player's in-frame body extent and the height setting (`peakWristSpeedMs`, Layer 2, `src/constants/proRanges.ts` for the reference band). Ball speed and hand speed are different numbers — the racket head multiplies hand speed several times on the way to contact — so never present the hand speed as "serve speed".
